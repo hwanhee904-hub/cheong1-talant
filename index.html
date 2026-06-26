@@ -130,7 +130,7 @@ var adminPin = null;
 var typing = false;
 
 var f = {
-  loginQ:'', loginPendingId:'', loginPin:'',
+  loginName:'', loginPin:'',
   regName:'', regSoon:'', regPhone:'', regTeam:'', regPin:'',
   earnQ:'', earnSel:'', earnAmt:'', earnLabel:'', setVal:'',
   giveSel:'', giveAmt:'',
@@ -211,20 +211,15 @@ function topbar(){
 // ---------- participant: auth ----------
 function authView(){
   var h = '<div class="panel narrow-panel"><div class="seg">'
-    + '<button class="'+(authTab==='login'?'on':'')+'" onclick="setAuthTab(\'login\')">내 이름 찾기</button>'
+    + '<button class="'+(authTab==='login'?'on':'')+'" onclick="setAuthTab(\'login\')">로그인</button>'
     + '<button class="'+(authTab==='register'?'on':'')+'" onclick="setAuthTab(\'register\')">처음이에요 (가입)</button></div>';
   if(authTab==='login'){
-    if(f.loginPendingId){
-      var pm=memberById(f.loginPendingId);
-      h += '<p class="hint"><strong>'+esc(pm?pm.name:'')+'</strong>님, 개인 PIN을 입력해 주세요.</p>'
-        + '<input class="input" type="password" inputmode="numeric" placeholder="PIN (숫자)" value="'+esc(f.loginPin)+'" oninput="f.loginPin=this.value" onkeydown="if(event.key===\'Enter\')doLoginPin()">'
-        + '<button class="btn btn-primary full" style="margin-top:12px" onclick="doLoginPin()">확인</button>'
-        + '<button class="btn full" style="margin-top:8px;background:rgba(255,255,255,.06)" onclick="f.loginPendingId=\'\';f.loginPin=\'\';render()">← 다시 선택</button>';
-    } else {
-      h += '<p class="hint">이름을 찾아 선택해 주세요.</p>'
-        + '<input class="input" placeholder="이름 검색" value="'+esc(f.loginQ)+'" oninput="f.loginQ=this.value;fillLoginList()">'
-        + '<div class="picker-list" id="loginList"></div>';
-    }
+    h += '<p class="hint">이름과 PIN을 입력하면 바로 로그인돼요.</p>'
+      + '<label class="field-label">이름</label>'
+      + '<input class="input" placeholder="이름" value="'+esc(f.loginName)+'" oninput="f.loginName=this.value" onkeydown="if(event.key===\'Enter\')document.getElementById(\'loginPinInput\').focus()">'
+      + '<label class="field-label">개인 PIN</label>'
+      + '<input class="input" id="loginPinInput" type="password" inputmode="numeric" placeholder="PIN" value="'+esc(f.loginPin)+'" oninput="f.loginPin=this.value" onkeydown="if(event.key===\'Enter\')doLogin()">'
+      + '<button class="btn btn-primary full" style="margin-top:14px" onclick="doLogin()">로그인</button>';
   } else if(!S.open){
     h += '<p class="muted center">현재 가입이 닫혀 있어요. 리더에게 문의해 주세요.</p>';
   } else if(S.teams.length===0){
@@ -242,30 +237,16 @@ function authView(){
     h += '</div><button class="btn btn-primary full" style="margin-top:18px" onclick="doRegister()">가입하고 시작하기</button>';
   }
   h += '</div>';
-  setTimeout(fillLoginList,0);
   return h;
 }
-function fillLoginList(){
-  var box=document.getElementById('loginList'); if(!box) return;
-  var q=f.loginQ.trim(), out='';
-  var arr=S.members.filter(function(m){ return m.name.indexOf(q)>=0; }).slice(0,40);
-  for(var i=0;i<arr.length;i++){ var m=arr[i];
-    out += '<button class="picker-item" onclick="identify(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
-      + '<span class="grow">'+esc(m.name)+'</span><span class="muted">'+esc(m.soon||teamNameOf(m.teamId))+'</span></button>';
-  }
-  if(q && arr.length===0) out='<p class="muted center">이름이 없어요. \'처음이에요\'로 가입해 주세요.</p>';
-  if(!q) out='<p class="muted center">이름을 검색해 주세요.</p>';
-  box.innerHTML=out;
-}
 function setAuthTab(t){ authTab=t; render(); }
-function identify(id){ f.loginPendingId=id; f.loginPin=''; render(); }
-function doLoginPin(){
-  var pin=f.loginPin.trim();
+function doLogin(){
+  var name=f.loginName.trim(), pin=f.loginPin.trim();
+  if(!name){ toast('이름을 입력해 주세요.','bad'); return; }
   if(!pin){ toast('PIN을 입력해 주세요.','bad'); return; }
-  call('verifyMemberPin', f.loginPendingId, pin).then(function(ok){
-    if(!ok){ toast('PIN이 올바르지 않아요.','bad'); f.loginPin=''; render(); return; }
-    myId=f.loginPendingId; try{localStorage.setItem('c1_myId',myId);}catch(e){}
-    f.loginPendingId=''; f.loginPin=''; recomputeMe(); pview='home'; render();
+  call('loginByNamePin', name, pin).then(function(m){
+    myId=m.id; try{localStorage.setItem('c1_myId',m.id);}catch(e){}
+    f.loginName=''; f.loginPin=''; recomputeMe(); pview='home'; render();
     toast('로그인됐어요!');
   }).catch(function(e){ toast(e.message||e,'bad'); });
 }
