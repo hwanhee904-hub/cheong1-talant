@@ -147,6 +147,7 @@ var f = {
   memQ:'',
   genN:'', genSuf:'팀', teamNames:'',
   iEmoji:'', iName:'', iPrice:'', iStock:'', iEmojiPicker:false,
+  pickerTeam:'',
   distFilter:'undone', distQ:'',
   setTitle:'', setPin:''
 };
@@ -416,62 +417,30 @@ function adminView(){
 }
 
 function memberPickerHtml(listId, q, selId, onpickFn){
-  var arr=S.members.filter(function(m){ return m.name.indexOf(q)>=0 || (m.soon||'').indexOf(q)>=0; })
-    .sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).slice(0,50);
   var out='';
-  for(var i=0;i<arr.length;i++){ var m=arr[i];
-    out+='<button class="picker-item '+(selId===m.id?'on':'')+'" onclick="'+onpickFn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
-      +'<span class="grow">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span><span class="muted">'+fmt(m.talents)+'</span></button>';
-  }
-  if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
-  return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
-}
-
-function adminEarn(){
-  var m=memberById(f.earnSel);
-  var quick=[10,20,30,50,100];
-  var h='<div class="panel"><h2 class="panel-title">달란트 적립 / 수정</h2><label class="field-label">참가자 선택</label>'
-    + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.earnQ)+'" oninput="f.earnQ=this.value;fillList(\'earnList\',f.earnQ,f.earnSel,\'pickEarn\')">'
-    + memberPickerHtml('earnList', f.earnQ, f.earnSel, 'pickEarn');
-  if(m) h+='<div class="balance">'+esc(m.name)+' · '+esc(teamNameOf(m.teamId))+' · 보유 <b>'+fmt(m.talents)+'</b></div>';
-  h+='<label class="field-label">미션 / 사유 (선택)</label><input class="input" value="'+esc(f.earnLabel)+'" oninput="f.earnLabel=this.value" placeholder="예: 새벽기도 참석">'
-    + '<label class="field-label">빠른 적립</label><div class="quick-row">';
-  for(var i=0;i<quick.length;i++) h+='<button class="quick" '+(m?'':'disabled')+' onclick="doEarn('+quick[i]+')">+'+quick[i]+'</button>';
-  h+='</div><label class="field-label">직접 입력 · 차감하려면 마이너스 (예: -50)</label><div class="row">'
-    + '<input class="input" type="number" value="'+esc(f.earnAmt)+'" oninput="f.earnAmt=this.value" placeholder="예: 50 또는 -50">'
-    + '<button class="btn btn-primary" '+(m?'':'disabled')+' onclick="doEarn()">반영</button></div>';
-  if(m){
-    h+='<label class="field-label">정확한 값으로 수정 (현재 '+fmt(m.talents)+')</label><div class="row">'
-      + '<input class="input" type="number" value="'+esc(f.setVal)+'" oninput="f.setVal=this.value" placeholder="정확한 달란트 수">'
-      + '<button class="btn btn-ghost" onclick="doSetTalents()">이 값으로 수정</button></div>';
-  }
-  var sel=f.earnSel;
-  var feed, hdr;
-  if(sel){
-    feed=S.log.filter(function(l){ return l.memberId===sel || (l.type==='transfer'&&l.ref===sel); }).slice(0,15);
-    hdr=(m?esc(m.name)+'님 ':'')+'적립 기록';
+  if(q && q.trim()){
+    var arr=S.members.filter(function(m){ return m.name.indexOf(q.trim())>=0 || (m.soon||'').indexOf(q.trim())>=0; })
+      .sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).slice(0,50);
+    for(var i=0;i<arr.length;i++){ var m=arr[i];
+      out+='<button class="picker-item '+(selId===m.id?'on':'')+'" onclick="'+onpickFn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span><span class="grow">'+esc(m.name)+'</span><span class="muted">'+fmt(m.talents)+'</span></button>';
+    }
+    if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
+  } else if(!f.pickerTeam){
+    var teams=S.teams.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+    for(var ti=0;ti<teams.length;ti++){ var t=teams[ti];
+      var cnt=S.members.filter(function(mm){return mm.teamId===t.id;}).length;
+      out+='<button class="picker-item" onclick="f.pickerTeam=\''+t.id+'\';render()"><span class="dot" style="background:'+t.color+'"></span><span class="grow">'+esc(t.name)+'</span><span class="muted small">'+cnt+'명 &#8250;</span></button>';
+    }
+    if(teams.length===0) out='<p class="muted center">팀이 없어요.</p>';
   } else {
-    feed=S.log.slice(0,10);
-    hdr='최근 기록 (취소로 되돌리기)';
+    var teamMembers=S.members.filter(function(mm){return mm.teamId===f.pickerTeam;}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+    out='<button class="picker-item" style="color:var(--mute);font-size:13px" onclick="f.pickerTeam=\'\';render()">&#8249; 순 목록으로</button>';
+    for(var mi=0;mi<teamMembers.length;mi++){ var mm=teamMembers[mi];
+      out+='<button class="picker-item '+(selId===mm.id?'on':'')+'" onclick="'+onpickFn+'(\''+mm.id+'\')"><span class="dot" style="background:'+teamColor(mm.teamId)+'"></span><span class="grow">'+esc(mm.name)+'</span><span class="muted">'+fmt(mm.talents)+'</span></button>';
+    }
+    if(teamMembers.length===0) out+='<p class="muted center">이 순에 참가자가 없어요.</p>';
   }
-  h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">'+hdr+'</div>';
-  for(var k=0;k<feed.length;k++){ var l=feed[k];
-    var received = !!sel && l.type==='transfer' && l.ref===sel;
-    var sign, cls, amt, lbl;
-    if(received){ sign='+'; cls='earn'; amt=fmt(Math.abs(l.amount)); lbl='받음 · '+esc(l.memberName); }
-    else if(l.type==='earn'){ sign='+'; cls='earn'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'미션'); }
-    else if(l.type==='adjust'){ var pos=Number(l.amount)>=0; sign=pos?'+':''; cls=pos?'earn':'spend'; amt=fmt(l.amount); lbl=esc(l.label||'수정'); }
-    else if(l.type==='spend'){ sign='-'; cls='spend'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'구매'); }
-    else { sign='-'; cls='spend'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'전달'); }
-    var first = sel ? '<span class="grow1 lbl">'+lbl+'</span>'
-                    : '<span class="grow1">'+esc(l.memberName)+'</span><span class="muted lbl">'+lbl+'</span>';
-    h+='<div class="mini-row">'+first
-      +'<span class="'+cls+'">'+sign+amt+'</span>'
-      + (l.id?'<button class="x" onclick="doUndo(\''+l.id+'\')">취소</button>':'') +'</div>';
-  }
-  if(feed.length===0) h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';
-  h+='</div></div>';
-  return h;
+  return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
 }
 function fillList(id,q,sel,fn){
   var box=document.getElementById(id); if(!box) return;
@@ -485,7 +454,7 @@ function fillList(id,q,sel,fn){
   if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
   box.innerHTML=out;
 }
-function pickEarn(id){ f.earnSel=id; render(); }
+function pickEarn(id){ f.earnSel=id; f.pickerTeam=''; render(); }
 function doEarn(q){
   var a = (q!=null)? q : Math.round(Number(f.earnAmt));
   if(!f.earnSel||!a){ toast('대상과 수량을 확인해 주세요.','bad'); return; }
@@ -606,7 +575,7 @@ function adminMarket(){
     + '<button class="btn btn-primary" onclick="addItemGo()">추가</button></div></div>';
   return h;
 }
-function pickBuy(id){ f.buySel=id; render(); }
+function pickBuy(id){ f.buySel=id; f.pickerTeam=''; render(); }
 function doBuy(itemId){
   if(!f.buySel){ toast('참가자를 먼저 선택해 주세요.','bad'); return; }
   call('buy', adminPin, f.buySel, itemId).then(function(){ return refresh(true); }).then(function(){toast('구매 완료!','buy');}).catch(function(e){toast(e.message||e,'bad');});
