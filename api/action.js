@@ -75,14 +75,48 @@ const actions = {
     return { members: s.members, teams: s.teams, items: s.items };
   },
 
-  async register(name, soon, phone, teamId) {
+  async register(name, soon, phone, teamId, pin) {
     const s = await readState();
     if (!s.open) throw new Error('현재 가입이 닫혀 있어요.');
     if (!trim_(name)) throw new Error('이름을 입력해 주세요.');
-    const m = { id: uid_(s), name: trim_(name), soon: trim_(soon), phone: trim_(phone), teamId, talents: 0 };
+    const p = trim_(pin);
+    if (!p || p.length < 4) throw new Error('개인 PIN을 4자리 이상 입력해 주세요.');
+    const m = { id: uid_(s), name: trim_(name), soon: trim_(soon), phone: trim_(phone), teamId, talents: 0, pin: p };
     s.members.push(m);
     await writeState(s);
     return pubMember_(m);
+  },
+
+  async verifyMemberPin(memberId, pin) {
+    const s = await readState();
+    const m = findMember_(s, memberId);
+    if (!m) throw new Error('멤버를 찾을 수 없어요.');
+    if (!m.pin) throw new Error('PIN이 설정되지 않았어요. 관리자에게 문의해 주세요.');
+    return trim_(m.pin) === trim_(pin);
+  },
+
+  async changeMemberPin(memberId, oldPin, newPin) {
+    const s = await readState();
+    const m = findMember_(s, memberId);
+    if (!m) throw new Error('멤버를 찾을 수 없어요.');
+    if (trim_(m.pin) !== trim_(oldPin)) throw new Error('기존 PIN이 올바르지 않아요.');
+    const np = trim_(newPin);
+    if (!np || np.length < 4) throw new Error('새 PIN을 4자리 이상 입력해 주세요.');
+    m.pin = np;
+    await writeState(s);
+    return true;
+  },
+
+  async resetMemberPin(adminPinValue, memberId, newPin) {
+    const s = await readState();
+    checkPin_(s, adminPinValue);
+    const m = findMember_(s, memberId);
+    if (!m) throw new Error('멤버를 찾을 수 없어요.');
+    const np = trim_(newPin);
+    if (!np || np.length < 4) throw new Error('새 PIN을 4자리 이상 입력해 주세요.');
+    m.pin = np;
+    await writeState(s);
+    return true;
   },
 
   async transfer(fromId, toId, amount) {
