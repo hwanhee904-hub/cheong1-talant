@@ -190,7 +190,7 @@ function refresh(initial){
 refresh(true);
 setInterval(function(){
   if(typing) return;
-  if(mode==='admin' && aview==='dist' && adminPin){ loadPurchases(); return; }
+  if(mode==='admin' && adminPin){ loadPurchases(); return; }
   refresh(false);
   if(mode==='participant' && me && pview==='market'){ loadMyPurchases(); }
 }, 7000);
@@ -393,7 +393,7 @@ function pinView(){
 function submitPin(){
   var v=document.getElementById('pinInput').value;
   call('verifyPin', v).then(function(ok){
-    if(ok){ adminPin=v; aview='earn'; render(); } else { toast('PIN이 올바르지 않습니다.','bad'); }
+    if(ok){ adminPin=v; aview='earn'; render(); loadPurchases(); } else { toast('PIN이 올바르지 않습니다.','bad'); }
   });
 }
 function setAview(v){ aview=v; if(v==='dist'){ loadPurchases(); } render(); }
