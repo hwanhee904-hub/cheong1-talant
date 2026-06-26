@@ -226,7 +226,6 @@ function authView(){
     h += '<p class="muted center">아직 팀이 준비되지 않았어요. 잠시만요.</p>';
   } else {
     h += '<label class="field-label">이름</label><input class="input" value="'+esc(f.regName)+'" oninput="f.regName=this.value" placeholder="이름">'
-      + '<label class="field-label">소속 순</label><input class="input" value="'+esc(f.regSoon)+'" oninput="f.regSoon=this.value" placeholder="예: 3순">'
       + '<label class="field-label">전화번호</label><input class="input" value="'+esc(f.regPhone)+'" oninput="f.regPhone=this.value" placeholder="010-0000-0000" inputmode="tel">'
       + '<label class="field-label">개인 PIN <span class="muted small">(4자리 이상, 로그인 시 사용)</span></label>'
       + '<input class="input" type="password" inputmode="numeric" value="'+esc(f.regPin)+'" oninput="f.regPin=this.value" placeholder="숫자 PIN 설정">'
