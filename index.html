@@ -527,7 +527,10 @@ function adminMembers(){
   var q=f.memQ.trim();
   var phones = window.__phones || {};
   var backBtn=f.memTeam?'<button class="btn btn-ghost" style="font-size:13px;padding:7px 12px" onclick="f.memTeam=\'\';render()">뒤로가기</button>':'';
-  var h='<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h2 class="panel-title" style="margin:0">멤버 · '+S.members.length+'명</h2>'+backBtn+'</div>'
+  var titleTeam=f.memTeam?S.teams.filter(function(t){return t.id===f.memTeam;})[0]:null;
+  var titleText=titleTeam?esc(titleTeam.name):'멤버 · '+S.members.length+'명';
+  var subText=titleTeam?'<span class="muted" style="font-size:14px;font-weight:400;margin-left:10px">총 '+fmt(teamTotal(titleTeam.id))+'달란트</span>':'';
+  var h='<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div><h2 class="panel-title" style="margin:0;display:inline">'+titleText+'</h2>'+subText+'</div>'+backBtn+'</div>'
     + '<p class="hint">전화번호는 \'멤버 정보 불러오기\'를 눌러야 표시돼요(관리자만).</p>'
     + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.memQ)+'" oninput="f.memQ=this.value;f.memTeam=\'\';render()">'
     + '<button class="btn btn-ghost" style="margin-top:10px" onclick="loadPhones()">전화번호 불러오기</button>'
@@ -558,8 +561,11 @@ function adminMembers(){
 function memberRow(m,phones){
   var opts='<option value="">미배정</option>';
   for(var j=0;j<S.teams.length;j++){ var t=S.teams[j]; opts+='<option value="'+t.id+'" '+(m.teamId===t.id?'selected':'')+'>'+esc(t.name)+'</option>'; }
+  var myTeam=S.teams.filter(function(t){return t.id===m.teamId;})[0];
+  var isLeader=myTeam && myTeam.name.replace(/\s*순\s*$/, '')===m.name;
+  var crown=isLeader?'<span style="font-size:12px;vertical-align:super;margin-left:2px">👑</span>':'';
   return '<div class="member-row"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
-    +'<div class="m-info"><span class="m-name">'+esc(m.name)+' <em>'+esc(m.soon)+'</em></span>'
+    +'<div class="m-info"><span class="m-name">'+esc(m.name)+crown+' <em>'+esc(m.soon)+'</em></span>'
     +'<span class="muted small">'+esc((phones||{})[m.id]||'번호: 미표시')+' · '+fmt(m.talents)+' 달란트</span></div>'
     +'<select class="mini-select" onchange="setMemTeam(\''+m.id+'\',this.value)">'+opts+'</select>'
     +'<button class="x" style="color:var(--mute);margin-right:2px" onclick="adminResetPin(\''+m.id+'\',\''+esc(m.name)+'\')">PIN</button>'
