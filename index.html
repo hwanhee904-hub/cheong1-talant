@@ -115,74 +115,567 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--gold);outline-o
 </head>
 <body>
 <div id="app"><div class="loading">불러오는 중…</div></div>
+
 <script>
-var S=null,me=null,myId=null;
-try{myId=localStorage.getItem('c1_myId');}catch(e){}
-var mode='participant',pview='home',aview='earn',boardSeg='team',authTab='login',adminPin=null,typing=false;
-var f={loginQ:'',regName:'',regSoon:'',regPhone:'',regTeam:'',earnQ:'',earnSel:'',earnAmt:'',earnLabel:'',setVal:'',giveSel:'',giveAmt:'',buyQ:'',buySel:'',memQ:'',genN:'',genSuf:'팀',teamNames:'',iEmoji:'',iName:'',iPrice:'',iStock:'',distFilter:'undone',distQ:'',setTitle:'',setPin:''};
-document.addEventListener('focusin',function(e){if(e.target.matches('input,textarea,select'))typing=true;});
-document.addEventListener('focusout',function(){typing=false;});
-function call(fn){var args=Array.prototype.slice.call(arguments,1);return fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fn:fn,args:args})}).then(function(r){return r.json();}).then(function(result){if(result.error)throw new Error(result.error);return result.data;});}
-function fmt(n){return(Number(n)||0).toLocaleString('ko-KR');}
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function teamTotal(tid){var t=0;for(var i=0;i<S.members.length;i++)if(S.members[i].teamId===tid)t+=S.members[i].talents||0;return t;}
-function teamColor(tid){for(var i=0;i<S.teams.length;i++)if(S.teams[i].id===tid)return S.teams[i].color;return'#888';}
-function teamNameOf(tid){for(var i=0;i<S.teams.length;i++)if(S.teams[i].id===tid)return S.teams[i].name;return'미배정';}
-function memberById(id){for(var i=0;i<S.members.length;i++)if(S.members[i].id===id)return S.members[i];return null;}
-function toast(msg,kind){var d=document.createElement('div');d.className='toast '+(kind||'good');d.textContent=msg;document.body.appendChild(d);setTimeout(function(){d.remove();},2200);}
-function recomputeMe(){me=myId?memberById(myId):null;if(myId&&S&&!me){myId=null;try{localStorage.removeItem('c1_myId');}catch(e){}}}
-function refresh(initial){return call('getState').then(function(s){S=s;recomputeMe();if(initial||!typing)render();}).catch(function(e){if(initial)document.getElementById('app').innerHTML='<div class="loading">연결 오류: '+esc(e.message||e)+'<br>새로고침 해주세요.</div>';});}
+// ===== state =====
+var S = null, me = null;
+var myId = null;
+try { myId = localStorage.getItem('c1_myId'); } catch(e) {}
+var mode = 'participant';
+var pview = 'home';
+var aview = 'earn';
+var boardSeg = 'team';
+var authTab = 'login';
+var adminPin = null;
+var typing = false;
+
+var f = {
+  loginQ:'', loginPendingId:'', loginPin:'',
+  regName:'', regSoon:'', regPhone:'', regTeam:'', regPin:'',
+  earnQ:'', earnSel:'', earnAmt:'', earnLabel:'', setVal:'',
+  giveSel:'', giveAmt:'',
+  buyQ:'', buySel:'',
+  memQ:'',
+  genN:'', genSuf:'팀', teamNames:'',
+  iEmoji:'', iName:'', iPrice:'', iStock:'',
+  distFilter:'undone', distQ:'',
+  setTitle:'', setPin:''
+};
+
+document.addEventListener('focusin', function(e){ if(e.target.matches('input,textarea,select')) typing=true; });
+document.addEventListener('focusout', function(){ typing=false; });
+
+// ===== server bridge (fetch 방식) =====
+function call(fn){
+  var args = Array.prototype.slice.call(arguments, 1);
+  return fetch('/api/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fn: fn, args: args })
+  }).then(function(r){ return r.json(); }).then(function(result){
+    if(result.error) throw new Error(result.error);
+    return result.data;
+  });
+}
+
+// ===== helpers =====
+function fmt(n){ return (Number(n)||0).toLocaleString('ko-KR'); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function teamTotal(tid){ var t=0; for(var i=0;i<S.members.length;i++) if(S.members[i].teamId===tid) t+=S.members[i].talents||0; return t; }
+function teamColor(tid){ for(var i=0;i<S.teams.length;i++) if(S.teams[i].id===tid) return S.teams[i].color; return '#888'; }
+function teamNameOf(tid){ for(var i=0;i<S.teams.length;i++) if(S.teams[i].id===tid) return S.teams[i].name; return '미배정'; }
+function memberById(id){ for(var i=0;i<S.members.length;i++) if(S.members[i].id===id) return S.members[i]; return null; }
+function toast(msg, kind){
+  var d=document.createElement('div'); d.className='toast '+(kind||'good'); d.textContent=msg;
+  document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 2200);
+}
+function recomputeMe(){ me = myId ? memberById(myId) : null; if(myId && S && !me){ myId=null; try{localStorage.removeItem('c1_myId');}catch(e){} } }
+
+// ===== load + poll =====
+function refresh(initial){
+  return call('getState').then(function(s){
+    S=s; recomputeMe();
+    if(initial || !typing) render();
+  }).catch(function(e){ if(initial) document.getElementById('app').innerHTML='<div class="loading">연결 오류: '+esc(e.message||e)+'<br>새로고침 해주세요.</div>'; });
+}
 refresh(true);
-setInterval(function(){if(typing)return;if(mode==='admin'&&aview==='dist'&&adminPin){loadPurchases();return;}refresh(false);if(mode==='participant'&&me&&pview==='market'){loadMyPurchases();}},7000);
-function render(){if(!S)return;var html=topbar();if(mode==='admin'){html+=adminPin?adminView():pinView();}else if(!me){html+=authView();}else{html+=participantView();}document.getElementById('app').innerHTML=html;}
-function topbar(){var right='';if(mode==='participant'){if(me)right+='<button class="link-btn" onclick="logout()">나가기</button>';right+='<button class="link-btn admin" onclick="goAdmin()">관리자</button>';}else{right+='<button class="link-btn" onclick="goParticipant()">← 참가자 화면</button>';}return'<div class="topbar"><div class="brand"><span class="coin" style="width:32px;height:32px;font-size:16px">D</span><h1 class="brand-name">'+esc(S.title)+'</h1></div><div class="row">'+right+'</div></div>';}
-function authView(){var h='<div class="panel narrow-panel"><div class="seg"><button class="'+(authTab==='login'?'on':'')+'" onclick="setAuthTab(\'login\')">내 이름 찾기</button><button class="'+(authTab==='register'?'on':'')+'" onclick="setAuthTab(\'register\')">처음이에요 (가입)</button></div>';if(authTab==='login'){h+='<p class="hint">한 번만 선택하면 이 휴대폰이 기억해요.</p><input class="input" placeholder="이름 검색" value="'+esc(f.loginQ)+'" oninput="f.loginQ=this.value;fillLoginList()"><div class="picker-list" id="loginList"></div>';}else if(!S.open){h+='<p class="muted center">현재 가입이 닫혀 있어요. 리더에게 문의해 주세요.</p>';}else if(S.teams.length===0){h+='<p class="muted center">아직 팀이 준비되지 않았어요. 잠시만요.</p>';}else{h+='<label class="field-label">이름</label><input class="input" value="'+esc(f.regName)+'" oninput="f.regName=this.value" placeholder="이름"><label class="field-label">소속 순</label><input class="input" value="'+esc(f.regSoon)+'" oninput="f.regSoon=this.value" placeholder="예: 3순"><label class="field-label">전화번호</label><input class="input" value="'+esc(f.regPhone)+'" oninput="f.regPhone=this.value" placeholder="010-0000-0000" inputmode="tel"><label class="field-label">팀 선택</label><div class="team-pills">';for(var i=0;i<S.teams.length;i++){var t=S.teams[i];h+='<button class="pill '+(f.regTeam===t.id?'on':'')+'" style="--c:'+t.color+'" onclick="f.regTeam=\''+t.id+'\';render()">'+esc(t.name)+'</button>';}h+='</div><button class="btn btn-primary full" style="margin-top:18px" onclick="doRegister()">가입하고 시작하기</button>';}h+='</div>';setTimeout(fillLoginList,0);return h;}
-function fillLoginList(){var box=document.getElementById('loginList');if(!box)return;var q=f.loginQ.trim(),out='';var arr=S.members.filter(function(m){return m.name.indexOf(q)>=0;}).slice(0,40);for(var i=0;i<arr.length;i++){var m=arr[i];out+='<button class="picker-item" onclick="identify(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span><span class="grow">'+esc(m.name)+'</span><span class="muted">'+esc(m.soon||teamNameOf(m.teamId))+'</span></button>';}if(q&&arr.length===0)out='<p class="muted center">이름이 없어요.</p>';if(!q)out='<p class="muted center">이름을 검색해 주세요.</p>';box.innerHTML=out;}
-function setAuthTab(t){authTab=t;render();}
-function identify(id){myId=id;try{localStorage.setItem('c1_myId',id);}catch(e){}recomputeMe();pview='home';render();}
-function logout(){myId=null;me=null;window.__myPurchases=null;try{localStorage.removeItem('c1_myId');}catch(e){}render();}
-function doRegister(){if(!f.regName.trim()||!f.regTeam){toast('이름과 팀을 확인해 주세요.','bad');return;}call('register',f.regName,f.regSoon,f.regPhone,f.regTeam).then(function(m){myId=m.id;try{localStorage.setItem('c1_myId',m.id);}catch(e){}f.regName=f.regSoon=f.regPhone=f.regTeam='';return refresh(true);}).then(function(){toast('가입 완료!');}).catch(function(e){toast(e.message||e,'bad');});}
-function participantView(){var c=teamColor(me.teamId);var teamsRanked=S.teams.map(function(t){return{id:t.id,name:t.name,color:t.color,total:teamTotal(t.id)};}).sort(function(a,b){return b.total-a.total;});var myTeamRank=1;for(var i=0;i<teamsRanked.length;i++){if(teamsRanked[i].id===me.teamId){myTeamRank=i+1;break;}}var membersRanked=S.members.slice().sort(function(a,b){return b.talents-a.talents;});var myRank=1;for(var j=0;j<membersRanked.length;j++){if(membersRanked[j].id===me.id){myRank=j+1;break;}}var h='<div class="me-card" style="--c:'+c+'"><div class="me-top"><span class="dot" style="background:'+c+'"></span><span class="me-name">'+esc(me.name)+'</span><span class="me-team">'+esc(teamNameOf(me.teamId))+(me.soon?' · '+esc(me.soon):'')+' </span></div><div class="me-talents">'+fmt(me.talents)+'<span class="unit">달란트</span></div><div class="me-stats"><span>내 순위 <b>'+myRank+'위</b> / '+S.members.length+'명</span><span>우리 팀 <b>'+myTeamRank+'위</b> · '+fmt(teamTotal(me.teamId))+'달란트</span></div></div>';h+='<div class="tabs"><button class="'+(pview==='home'?'on':'')+'" onclick="setPview(\'home\')">순위</button><button class="'+(pview==='give'?'on':'')+'" onclick="setPview(\'give\')">팀원에게 주기</button><button class="'+(pview==='market'?'on':'')+'" onclick="setPview(\'market\')">달란트 시장</button></div>';if(pview==='home')h+=boards(me.teamId,me.id);else if(pview==='give')h+=giveView();else h+=marketBrowse();return h;}
-function setPview(v){pview=v;if(v==='market')loadMyPurchases();render();}
-function boards(hiTeam,hiMember){var medals=['🥇','🥈','🥉'];var h='<div class="seg"><button class="'+(boardSeg==='team'?'on':'')+'" onclick="boardSeg=\'team\';render()">팀 순위</button><button class="'+(boardSeg==='indiv'?'on':'')+'" onclick="boardSeg=\'indiv\';render()">개인 순위</button></div><div class="rank-list">';if(boardSeg==='team'){var tr=S.teams.map(function(t){return{id:t.id,name:t.name,color:t.color,total:teamTotal(t.id)};}).sort(function(a,b){return b.total-a.total;});var top=tr.length?tr[0].total:0;for(var i=0;i<tr.length;i++){var t=tr[i];h+='<div class="rank-card '+(t.id===hiTeam?'mine':'')+'" style="--c:'+t.color+'"><span class="rk">'+(medals[i]||(i+1))+'</span><span class="dot" style="background:'+t.color+'"></span><span class="rk-name">'+esc(t.name)+'</span><div class="rk-bar"><span style="width:'+(top?(t.total/top*100):0)+'%;background:'+t.color+'"></span></div><span class="rk-val">'+fmt(t.total)+'</span></div>';}if(tr.length===0)h+='<p class="muted center">아직 팀이 없어요.</p>';}else{var mr=S.members.slice().sort(function(a,b){return b.talents-a.talents;}).slice(0,40);var topm=mr.length?mr[0].talents:0;for(var k=0;k<mr.length;k++){var m=mr[k];var c=teamColor(m.teamId);h+='<div class="rank-card '+(m.id===hiMember?'mine':'')+'" style="--c:'+c+'"><span class="rk">'+(medals[k]||(k+1))+'</span><span class="dot" style="background:'+c+'"></span><span class="rk-name">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span><div class="rk-bar"><span style="width:'+(topm?(m.talents/topm*100):0)+'%;background:'+c+'"></span></div><span class="rk-val">'+fmt(m.talents)+'</span></div>';}if(mr.length===0)h+='<p class="muted center">아직 참가자가 없어요.</p>';}return h+'</div>';}
-function giveView(){if(!me.teamId)return'<div class="empty"><p>팀이 배정되어야 주고받을 수 있어요.</p></div>';var mates=S.members.filter(function(m){return m.teamId===me.teamId&&m.id!==me.id;});if(mates.length===0)return'<div class="empty"><p>같은 팀에 다른 팀원이 아직 없어요.</p></div>';var c=teamColor(me.teamId);var h='<div class="panel"><p class="hint">같은 팀원에게 내 달란트를 나눠줄 수 있어요. (보유 '+fmt(me.talents)+')</p><label class="field-label">받는 팀원</label><div class="team-pills">';for(var i=0;i<mates.length;i++){var m=mates[i];h+='<button class="pill '+(f.giveSel===m.id?'on':'')+'" style="--c:'+c+'" onclick="f.giveSel=\''+m.id+'\';render()">'+esc(m.name)+' <em>'+fmt(m.talents)+'</em></button>';}h+='</div><label class="field-label">보낼 달란트</label><div class="row"><input class="input" type="number" min="1" value="'+esc(f.giveAmt)+'" oninput="f.giveAmt=this.value" placeholder="수량"><button class="btn btn-primary" onclick="doGive()">보내기</button></div></div>';return h;}
-function doGive(){var amt=Math.round(Number(f.giveAmt));if(!f.giveSel||!(amt>0)){toast('받는 팀원과 수량을 확인해 주세요.','bad');return;}if(amt>me.talents){toast('달란트가 부족해요.','bad');return;}call('transfer',me.id,f.giveSel,amt).then(function(){f.giveAmt='';f.giveSel='';return refresh(true);}).then(function(){toast('전달 완료!','buy');}).catch(function(e){toast(e.message||e,'bad');});}
-function marketBrowse(){if(S.items.length===0)return'<div class="empty"><p>아직 시장에 상품이 없어요.</p></div>';var h='<div class="panel"><p class="hint">사고 싶은 상품의 구매 버튼을 누르면 내 달란트에서 바로 차감돼요. 내 보유: <b>'+fmt(me.talents)+'</b> 달란트</p><div class="market-grid">';for(var i=0;i<S.items.length;i++){var it=S.items[i];var ok=it.stock>0&&me.talents>=it.price;var label=it.stock<=0?'품절':(me.talents<it.price?'부족':'구매');h+='<div class="item-card '+(it.stock<=0?'out':'')+'"><div class="item-emoji">'+esc(it.emoji)+'</div><div class="item-name">'+esc(it.name)+'</div><div class="item-price"><span class="coin" style="width:16px;height:16px;font-size:8px">D</span> '+fmt(it.price)+'</div><div class="item-stock">'+(it.stock>0?'남은 수량 '+it.stock:'품절')+'</div><button class="btn btn-buy" '+(ok?'':'disabled')+' onclick="doSelfBuy(\''+it.id+'\')">'+label+'</button></div>';}h+='</div>';var mine=window.__myPurchases;h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">내 구매 내역 · 배부 상태</div>';if(!mine){h+='<p class="muted small">불러오는 중…</p>';}else if(mine.length===0){h+='<p class="muted small">아직 구매한 상품이 없어요.</p>';}else{for(var k=0;k<mine.length;k++){var p=mine[k];var badge=p.done?'<span class="badge ok">받음</span>':'<span class="badge wait">대기중</span>';h+='<div class="mini-row"><span class="grow1 lbl">'+esc(p.item)+'</span><span class="spend">-'+fmt(p.price)+'</span>'+badge+'</div>';}}h+='</div>';return h+'</div>';}
-function doSelfBuy(itemId){var it=null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===itemId)it=S.items[i];if(!it)return;if(!confirm(it.name+' 을(를) '+fmt(it.price)+' 달란트로 구매할까요?'))return;call('selfBuy',me.id,itemId).then(function(){return refresh(true);}).then(function(){toast('구매 완료! '+it.name,'buy');loadMyPurchases();}).catch(function(e){toast(e.message||e,'bad');});}
-function loadMyPurchases(){if(!me)return;call('getMyPurchases',me.id).then(function(arr){window.__myPurchases=arr;if(!typing)render();}).catch(function(){});}
-function goAdmin(){mode='admin';render();}
-function goParticipant(){mode='participant';render();}
-function pinView(){return'<div class="panel narrow-panel"><h2 class="panel-title">관리자 확인</h2><p class="muted">PIN을 입력하세요</p><input class="input" id="pinInput" type="password" placeholder="••••" onkeydown="if(event.key===\'Enter\')submitPin()"><div class="row" style="margin-top:14px"><button class="btn btn-ghost" onclick="goParticipant()">취소</button><button class="btn btn-primary" onclick="submitPin()">확인</button></div></div>';}
-function submitPin(){var v=document.getElementById('pinInput').value;call('verifyPin',v).then(function(ok){if(ok){adminPin=v;aview='earn';render();}else{toast('PIN이 올바르지 않습니다.','bad');}});}
-function setAview(v){aview=v;if(v==='dist'){loadPurchases();}render();}
-function adminView(){var tabs=[['earn','적립'],['members','멤버'],['teams','팀'],['market','시장'],['dist','배부'],['settings','설정']];var h='<div class="tabs">';for(var i=0;i<tabs.length;i++)h+='<button class="'+(aview===tabs[i][0]?'on':'')+'" onclick="setAview(\''+tabs[i][0]+'\')">'+tabs[i][1]+'</button>';h+='</div>';if(aview==='earn')h+=adminEarn();else if(aview==='members')h+=adminMembers();else if(aview==='teams')h+=adminTeams();else if(aview==='market')h+=adminMarket();else if(aview==='dist')h+=adminDistribute();else h+=adminSettings();return h;}
-function memberPickerHtml(listId,q,selId,onpickFn){var arr=S.members.filter(function(m){return m.name.indexOf(q)>=0||(m.soon||'').indexOf(q)>=0;}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).slice(0,50);var out='';for(var i=0;i<arr.length;i++){var m=arr[i];out+='<button class="picker-item '+(selId===m.id?'on':'')+'" onclick="'+onpickFn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span><span class="grow">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span><span class="muted">'+fmt(m.talents)+'</span></button>';}if(arr.length===0)out='<p class="muted center">참가자가 없어요.</p>';return'<div class="picker-list" id="'+listId+'">'+out+'</div>';}
-function adminEarn(){var m=memberById(f.earnSel);var quick=[10,20,30,50,100];var h='<div class="panel"><h2 class="panel-title">달란트 적립 / 수정</h2><label class="field-label">참가자 선택</label><input class="input" placeholder="이름/순 검색" value="'+esc(f.earnQ)+'" oninput="f.earnQ=this.value;fillList(\'earnList\',f.earnQ,f.earnSel,\'pickEarn\')">'+memberPickerHtml('earnList',f.earnQ,f.earnSel,'pickEarn');if(m)h+='<div class="balance">'+esc(m.name)+' · '+esc(teamNameOf(m.teamId))+' · 보유 <b>'+fmt(m.talents)+'</b></div>';h+='<label class="field-label">미션 / 사유 (선택)</label><input class="input" value="'+esc(f.earnLabel)+'" oninput="f.earnLabel=this.value" placeholder="예: 새벽기도 참석"><label class="field-label">빠른 적립</label><div class="quick-row">';for(var i=0;i<quick.length;i++)h+='<button class="quick" '+(m?'':'disabled')+' onclick="doEarn('+quick[i]+')">+'+quick[i]+'</button>';h+='</div><label class="field-label">직접 입력 · 차감하려면 마이너스</label><div class="row"><input class="input" type="number" value="'+esc(f.earnAmt)+'" oninput="f.earnAmt=this.value" placeholder="예: 50 또는 -50"><button class="btn btn-primary" '+(m?'':'disabled')+' onclick="doEarn()">반영</button></div>';if(m){h+='<label class="field-label">정확한 값으로 수정 (현재 '+fmt(m.talents)+')</label><div class="row"><input class="input" type="number" value="'+esc(f.setVal)+'" oninput="f.setVal=this.value" placeholder="정확한 달란트 수"><button class="btn btn-ghost" onclick="doSetTalents()">이 값으로 수정</button></div>';}var sel=f.earnSel;var feed,hdr;if(sel){feed=S.log.filter(function(l){return l.memberId===sel||(l.type==='transfer'&&l.ref===sel);}).slice(0,15);hdr=(m?esc(m.name)+'님 ':'')+'적립 기록';}else{feed=S.log.slice(0,10);hdr='최근 기록 (취소로 되돌리기)';}h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">'+hdr+'</div>';for(var k=0;k<feed.length;k++){var l=feed[k];var received=!!sel&&l.type==='transfer'&&l.ref===sel;var sign,cls,amt,lbl;if(received){sign='+';cls='earn';amt=fmt(Math.abs(l.amount));lbl='받음 · '+esc(l.memberName);}else if(l.type==='earn'){sign='+';cls='earn';amt=fmt(Math.abs(l.amount));lbl=esc(l.label||'미션');}else if(l.type==='adjust'){var pos=Number(l.amount)>=0;sign=pos?'+':'';cls=pos?'earn':'spend';amt=fmt(l.amount);lbl=esc(l.label||'수정');}else if(l.type==='spend'){sign='-';cls='spend';amt=fmt(Math.abs(l.amount));lbl=esc(l.label||'구매');}else{sign='-';cls='spend';amt=fmt(Math.abs(l.amount));lbl=esc(l.label||'전달');}var first=sel?'<span class="grow1 lbl">'+lbl+'</span>':'<span class="grow1">'+esc(l.memberName)+'</span><span class="muted lbl">'+lbl+'</span>';h+='<div class="mini-row">'+first+'<span class="'+cls+'">'+sign+amt+'</span>'+(l.id?'<button class="x" onclick="doUndo(\''+l.id+'\')">취소</button>':'')+'</div>';}if(feed.length===0)h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';h+='</div></div>';return h;}
-function fillList(id,q,sel,fn){var box=document.getElementById(id);if(!box)return;var arr=S.members.filter(function(m){return m.name.indexOf(q.trim())>=0||(m.soon||'').indexOf(q.trim())>=0;}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).slice(0,50);var out='';for(var i=0;i<arr.length;i++){var m=arr[i];out+='<button class="picker-item '+(sel===m.id?'on':'')+'" onclick="'+fn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span><span class="grow">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span><span class="muted">'+fmt(m.talents)+'</span></button>';}if(arr.length===0)out='<p class="muted center">참가자가 없어요.</p>';box.innerHTML=out;}
-function pickEarn(id){f.earnSel=id;render();}
-function doEarn(q){var a=(q!=null)?q:Math.round(Number(f.earnAmt));if(!f.earnSel||!a){toast('대상과 수량을 확인해 주세요.','bad');return;}call('earn',adminPin,f.earnSel,a,f.earnLabel).then(function(m){f.earnAmt='';f.earnLabel='';return refresh(true);}).then(function(){toast('반영 완료! '+(a>0?'+':'')+fmt(a));}).catch(function(e){toast(e.message||e,'bad');});}
-function doSetTalents(){if(!f.earnSel||f.setVal===''){toast('수정할 값을 입력해 주세요.','bad');return;}var v=Math.round(Number(f.setVal));call('setTalents',adminPin,f.earnSel,v).then(function(){f.setVal='';return refresh(true);}).then(function(){toast('수정 완료! → '+fmt(v));}).catch(function(e){toast(e.message||e,'bad');});}
-function doUndo(id){if(!confirm('이 기록을 취소(되돌리기)할까요?'))return;call('undoEntry',adminPin,id).then(function(){return refresh(true);}).then(function(){toast('취소했어요.');}).catch(function(e){toast(e.message||e,'bad');});}
-function adminMembers(){var arr=S.members.filter(function(m){var q=f.memQ.trim();return m.name.indexOf(q)>=0||(m.soon||'').indexOf(q)>=0;}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});var h='<div class="panel"><h2 class="panel-title">멤버 · '+S.members.length+'명</h2><p class="hint">전화번호는 \'멤버 정보 불러오기\'를 눌러야 표시돼요(관리자만).</p><input class="input" placeholder="이름/순 검색" value="'+esc(f.memQ)+'" oninput="f.memQ=this.value;render()"><button class="btn btn-ghost" style="margin-top:10px" onclick="loadPhones()">전화번호 불러오기</button><div class="list" style="margin-top:12px">';var phones=window.__phones||{};for(var i=0;i<arr.length;i++){var m=arr[i];var opts='<option value="">미배정</option>';for(var j=0;j<S.teams.length;j++){var t=S.teams[j];opts+='<option value="'+t.id+'" '+(m.teamId===t.id?'selected':'')+'>'+esc(t.name)+'</option>';}h+='<div class="member-row"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span><div class="m-info"><span class="m-name">'+esc(m.name)+' <em>'+esc(m.soon)+'</em></span><span class="muted small">'+esc(phones[m.id]||'번호: 미표시')+' · '+fmt(m.talents)+' 달란트</span></div><select class="mini-select" onchange="setMemTeam(\''+m.id+'\',this.value)">'+opts+'</select><button class="x" onclick="delMember(\''+m.id+'\',\''+esc(m.name)+'\')">삭제</button></div>';}if(arr.length===0)h+='<p class="muted center">참가자가 없습니다.</p>';return h+'</div></div>';}
-function loadPhones(){call('getAdminData',adminPin).then(function(d){var ph={};for(var i=0;i<d.members.length;i++)ph[d.members[i].id]=d.members[i].phone||'번호 미입력';window.__phones=ph;render();toast('전화번호를 불러왔어요.');}).catch(function(e){toast(e.message||e,'bad');});}
-function setMemTeam(id,tid){call('setMemberTeam',adminPin,id,tid).then(function(){return refresh(true);}).catch(function(e){toast(e.message||e,'bad');});}
-function delMember(id,name){if(!confirm(name+' 님을 삭제할까요?'))return;call('removeMember',adminPin,id).then(function(){return refresh(true);}).then(function(){toast('삭제했어요.');}).catch(function(e){toast(e.message||e,'bad');});}
-function adminTeams(){var h='<div class="panel"><h2 class="panel-title">팀 · '+S.teams.length+'팀</h2><label class="field-label">번호로 한 번에 만들기</label><div class="row"><input class="input narrow" type="number" min="1" max="20" value="'+esc(f.genN)+'" oninput="f.genN=this.value" placeholder="개수 (예:19)"><input class="input narrow" value="'+esc(f.genSuf)+'" oninput="f.genSuf=this.value" placeholder="단위"><button class="btn btn-primary" onclick="genTeams()">생성</button></div><label class="field-label">이름으로 추가 (쉼표로 여러 개)</label><div class="row"><input class="input" value="'+esc(f.teamNames)+'" oninput="f.teamNames=this.value" placeholder="사자팀, 어린양팀"><button class="btn btn-ghost" onclick="addTeamsByName()">추가</button></div><div class="list">';for(var i=0;i<S.teams.length;i++){var t=S.teams[i];var cnt=S.members.filter(function(m){return m.teamId===t.id;}).length;h+='<div class="list-row"><span class="dot" style="background:'+t.color+'"></span><span class="grow">'+esc(t.name)+'</span><span class="muted">'+cnt+'명 · '+fmt(teamTotal(t.id))+'달란트</span><button class="x" onclick="delTeam(\''+t.id+'\',\''+esc(t.name)+'\')">삭제</button></div>';}if(S.teams.length===0)h+='<p class="muted">팀이 없습니다.</p>';return h+'</div></div>';}
-function genTeams(){var n=Math.min(20,Math.round(Number(f.genN)));if(!(n>0)){toast('개수를 확인해 주세요.','bad');return;}var suf=f.genSuf.trim()||'팀';var names=[];for(var i=1;i<=n;i++)names.push(i+suf);call('addTeams',adminPin,names).then(function(){f.genN='';return refresh(true);}).then(function(){toast(n+'개 팀 생성!');}).catch(function(e){toast(e.message||e,'bad');});}
-function addTeamsByName(){var names=f.teamNames.split(/[,\n]/).map(function(s){return s.trim();}).filter(Boolean);if(names.length===0)return;call('addTeams',adminPin,names).then(function(){f.teamNames='';return refresh(true);}).then(function(){toast('추가했어요.');}).catch(function(e){toast(e.message||e,'bad');});}
-function delTeam(id,name){if(!confirm(name+' 팀을 삭제할까요? (소속 인원은 미배정 처리)'))return;call('removeTeam',adminPin,id).then(function(){return refresh(true);}).catch(function(e){toast(e.message||e,'bad');});}
-function adminMarket(){var m=memberById(f.buySel);var h='<div class="panel"><h2 class="panel-title">달란트 시장 (구매 처리)</h2><label class="field-label">구매할 참가자</label><input class="input" placeholder="이름/순 검색" value="'+esc(f.buyQ)+'" oninput="f.buyQ=this.value;fillList(\'buyList\',f.buyQ,f.buySel,\'pickBuy\')">'+memberPickerHtml('buyList',f.buyQ,f.buySel,'pickBuy');if(m)h+='<div class="balance">'+esc(m.name)+' · 보유 <b>'+fmt(m.talents)+'</b></div>';h+='<div class="market-grid" style="margin-top:10px">';for(var i=0;i<S.items.length;i++){var it=S.items[i];var ok=m&&m.talents>=it.price&&it.stock>0;h+='<div class="item-card '+(it.stock<=0?'out':'')+'"><button class="item-del" onclick="delItem(\''+it.id+'\')">×</button><div class="item-emoji">'+esc(it.emoji)+'</div><div class="item-name">'+esc(it.name)+'</div><div class="item-price"><span class="coin" style="width:16px;height:16px;font-size:8px">D</span> '+fmt(it.price)+'</div><div class="item-stock">'+(it.stock>0?'남은 수량 '+it.stock:'품절')+'</div><button class="btn btn-buy" '+(ok?'':'disabled')+' onclick="doBuy(\''+it.id+'\')">'+(it.stock<=0?'품절':(!m?'참가자 선택':(ok?'구매':'부족')))+'</button></div>';}if(S.items.length===0)h+='<p class="muted">상품을 추가해 주세요.</p>';h+='</div><h3 class="sub">상품 추가</h3><div class="row wrap"><input class="input" style="flex:0 0 56px;text-align:center" maxlength="2" value="'+esc(f.iEmoji)+'" oninput="f.iEmoji=this.value" placeholder="🎁"><input class="input" value="'+esc(f.iName)+'" oninput="f.iName=this.value" placeholder="상품 이름"><input class="input narrow" type="number" value="'+esc(f.iPrice)+'" oninput="f.iPrice=this.value" placeholder="가격"><input class="input narrow" type="number" value="'+esc(f.iStock)+'" oninput="f.iStock=this.value" placeholder="수량"><button class="btn btn-primary" onclick="addItemGo()">추가</button></div></div>';return h;}
-function pickBuy(id){f.buySel=id;render();}
-function doBuy(itemId){if(!f.buySel){toast('참가자를 먼저 선택해 주세요.','bad');return;}call('buy',adminPin,f.buySel,itemId).then(function(){return refresh(true);}).then(function(){toast('구매 완료!','buy');}).catch(function(e){toast(e.message||e,'bad');});}
-function addItemGo(){if(!f.iName.trim()||!f.iPrice||!f.iStock){toast('상품 정보를 확인해 주세요.','bad');return;}call('addItem',adminPin,f.iName,f.iPrice,f.iStock,f.iEmoji).then(function(){f.iName=f.iPrice=f.iStock=f.iEmoji='';return refresh(true);}).then(function(){toast('상품 추가!');}).catch(function(e){toast(e.message||e,'bad');});}
-function delItem(id){call('removeItem',adminPin,id).then(function(){return refresh(true);}).catch(function(e){toast(e.message||e,'bad');});}
-function adminDistribute(){var arr=window.__purchases;var h='<div class="panel"><h2 class="panel-title">배부 (구매 내역)</h2><button class="btn btn-ghost" onclick="loadPurchases()">새로고침</button>';if(!arr){return h+'<p class="muted center" style="margin-top:16px">불러오는 중…</p></div>';}var undone=arr.filter(function(p){return!p.done;});var byItem={};for(var i=0;i<undone.length;i++){byItem[undone[i].item]=(byItem[undone[i].item]||0)+1;}var sum='';for(var k in byItem){sum+='<span class="chip">'+esc(k)+' × '+byItem[k]+'</span>';}h+='<div class="chips" style="margin:12px 0">'+(sum||'<span class="muted">배부할 항목이 없어요.</span>')+'</div>';h+='<div class="seg"><button class="'+(f.distFilter==='undone'?'on':'')+'" onclick="f.distFilter=\'undone\';render()">미배부 ('+undone.length+')</button><button class="'+(f.distFilter==='done'?'on':'')+'" onclick="f.distFilter=\'done\';render()">완료 ('+(arr.length-undone.length)+')</button><button class="'+(f.distFilter==='all'?'on':'')+'" onclick="f.distFilter=\'all\';render()">전체 ('+arr.length+')</button></div>';h+='<input class="input" placeholder="이름/상품 검색" value="'+esc(f.distQ)+'" oninput="f.distQ=this.value;render()">';var q=f.distQ.trim();var list=arr.filter(function(p){if(f.distFilter==='undone'&&p.done)return false;if(f.distFilter==='done'&&!p.done)return false;if(q&&p.name.indexOf(q)<0&&p.item.indexOf(q)<0)return false;return true;});h+='<div class="list" style="margin-top:12px">';for(var j=0;j<list.length;j++){var p=list[j];h+='<div class="member-row'+(p.done?' done':'')+'"><div class="m-info"><span class="m-name">'+esc(p.item)+'</span><span class="muted small">'+esc(p.name)+' · '+esc(p.team)+' · '+fmt(p.price)+'D</span></div><button class="btn '+(p.done?'btn-ghost':'btn-primary')+'" onclick="toggleDone(\''+p.id+'\','+(p.done?'false':'true')+')">'+(p.done?'배부취소':'배부완료')+'</button></div>';}if(list.length===0)h+='<p class="muted center">해당 내역이 없어요.</p>';return h+'</div></div>';}
-function loadPurchases(){if(!adminPin)return;call('getPurchases',adminPin).then(function(arr){window.__purchases=arr;if(!typing)render();}).catch(function(e){toast(e.message||e,'bad');});}
-function toggleDone(id,done){if(window.__purchases){for(var i=0;i<window.__purchases.length;i++)if(window.__purchases[i].id===id)window.__purchases[i].done=done;}render();call('markPurchaseDone',adminPin,id,done).catch(function(e){toast(e.message||e,'bad');loadPurchases();});}
-function adminSettings(){if(f.setTitle==='')f.setTitle=S.title;return'<div class="panel"><h2 class="panel-title">설정</h2><label class="field-label">행사 제목</label><input class="input" value="'+esc(f.setTitle)+'" oninput="f.setTitle=this.value"><label class="field-label">새 관리자 PIN (바꿀 때만 입력)</label><div class="row"><input class="input narrow" value="'+esc(f.setPin)+'" oninput="f.setPin=this.value" placeholder="새 PIN"><button class="btn btn-ghost" onclick="saveMeta()">저장</button></div><h3 class="sub">회원가입</h3><div class="row"><span class="muted">현재: '+(S.open?'열림':'닫힘')+'</span><button class="btn btn-ghost" onclick="toggleOpen()">'+(S.open?'가입 닫기':'가입 열기')+'</button></div><h3 class="sub danger-title">초기화</h3><button class="btn btn-ghost danger" onclick="doReset()">모든 데이터 초기화</button><p class="hint" style="margin-top:14px">데이터는 Vercel KV에 저장됩니다.</p></div>';}
-function saveMeta(){call('setMeta',adminPin,{title:f.setTitle,newPin:f.setPin}).then(function(){if(f.setPin.trim())adminPin=f.setPin.trim();f.setPin='';return refresh(true);}).then(function(){toast('저장했어요.');}).catch(function(e){toast(e.message||e,'bad');});}
-function toggleOpen(){call('setMeta',adminPin,{open:!S.open}).then(function(){return refresh(true);}).catch(function(e){toast(e.message||e,'bad');});}
-function doReset(){if(!confirm('정말 모든 데이터를 초기화할까요? (멤버·팀·달란트·상품 삭제)'))return;call('resetAll',adminPin).then(function(){window.__phones={};window.__purchases=null;return refresh(true);}).then(function(){toast('초기화 완료.');}).catch(function(e){toast(e.message||e,'bad');});}
+setInterval(function(){
+  if(typing) return;
+  if(mode==='admin' && aview==='dist' && adminPin){ loadPurchases(); return; }
+  refresh(false);
+  if(mode==='participant' && me && pview==='market'){ loadMyPurchases(); }
+}, 7000);
+
+// ===== render =====
+function render(){
+  if(!S){ return; }
+  var html = topbar();
+  if(mode==='admin'){ html += adminPin ? adminView() : pinView(); }
+  else if(!me){ html += authView(); }
+  else { html += participantView(); }
+  document.getElementById('app').innerHTML = html;
+}
+
+function topbar(){
+  var right = '';
+  if(mode==='participant'){
+    if(me) right += '<button class="link-btn" onclick="logout()">나가기</button>';
+    right += '<button class="link-btn admin" onclick="goAdmin()">관리자</button>';
+  } else {
+    right += '<button class="link-btn" onclick="goParticipant()">← 참가자 화면</button>';
+  }
+  return '<div class="topbar"><div class="brand"><span class="coin" style="width:32px;height:32px;font-size:16px">D</span>'
+    + '<h1 class="brand-name">'+esc(S.title)+'</h1></div><div class="row">'+right+'</div></div>';
+}
+
+// ---------- participant: auth ----------
+function authView(){
+  var h = '<div class="panel narrow-panel"><div class="seg">'
+    + '<button class="'+(authTab==='login'?'on':'')+'" onclick="setAuthTab(\'login\')">내 이름 찾기</button>'
+    + '<button class="'+(authTab==='register'?'on':'')+'" onclick="setAuthTab(\'register\')">처음이에요 (가입)</button></div>';
+  if(authTab==='login'){
+    if(f.loginPendingId){
+      var pm=memberById(f.loginPendingId);
+      h += '<p class="hint"><strong>'+esc(pm?pm.name:'')+'</strong>님, 개인 PIN을 입력해 주세요.</p>'
+        + '<input class="input" type="password" inputmode="numeric" placeholder="PIN (숫자)" value="'+esc(f.loginPin)+'" oninput="f.loginPin=this.value" onkeydown="if(event.key===\'Enter\')doLoginPin()">'
+        + '<button class="btn btn-primary full" style="margin-top:12px" onclick="doLoginPin()">확인</button>'
+        + '<button class="btn full" style="margin-top:8px;background:rgba(255,255,255,.06)" onclick="f.loginPendingId=\'\';f.loginPin=\'\';render()">← 다시 선택</button>';
+    } else {
+      h += '<p class="hint">이름을 찾아 선택해 주세요.</p>'
+        + '<input class="input" placeholder="이름 검색" value="'+esc(f.loginQ)+'" oninput="f.loginQ=this.value;fillLoginList()">'
+        + '<div class="picker-list" id="loginList"></div>';
+    }
+  } else if(!S.open){
+    h += '<p class="muted center">현재 가입이 닫혀 있어요. 리더에게 문의해 주세요.</p>';
+  } else if(S.teams.length===0){
+    h += '<p class="muted center">아직 팀이 준비되지 않았어요. 잠시만요.</p>';
+  } else {
+    h += '<label class="field-label">이름</label><input class="input" value="'+esc(f.regName)+'" oninput="f.regName=this.value" placeholder="이름">'
+      + '<label class="field-label">소속 순</label><input class="input" value="'+esc(f.regSoon)+'" oninput="f.regSoon=this.value" placeholder="예: 3순">'
+      + '<label class="field-label">전화번호</label><input class="input" value="'+esc(f.regPhone)+'" oninput="f.regPhone=this.value" placeholder="010-0000-0000" inputmode="tel">'
+      + '<label class="field-label">개인 PIN <span class="muted small">(4자리 이상, 로그인 시 사용)</span></label>'
+      + '<input class="input" type="password" inputmode="numeric" value="'+esc(f.regPin)+'" oninput="f.regPin=this.value" placeholder="숫자 PIN 설정">'
+      + '<label class="field-label">팀 선택</label><div class="team-pills">';
+    for(var i=0;i<S.teams.length;i++){ var t=S.teams[i];
+      h += '<button class="pill '+(f.regTeam===t.id?'on':'')+'" style="--c:'+t.color+'" onclick="f.regTeam=\''+t.id+'\';render()">'+esc(t.name)+'</button>';
+    }
+    h += '</div><button class="btn btn-primary full" style="margin-top:18px" onclick="doRegister()">가입하고 시작하기</button>';
+  }
+  h += '</div>';
+  setTimeout(fillLoginList,0);
+  return h;
+}
+function fillLoginList(){
+  var box=document.getElementById('loginList'); if(!box) return;
+  var q=f.loginQ.trim(), out='';
+  var arr=S.members.filter(function(m){ return m.name.indexOf(q)>=0; }).slice(0,40);
+  for(var i=0;i<arr.length;i++){ var m=arr[i];
+    out += '<button class="picker-item" onclick="identify(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
+      + '<span class="grow">'+esc(m.name)+'</span><span class="muted">'+esc(m.soon||teamNameOf(m.teamId))+'</span></button>';
+  }
+  if(q && arr.length===0) out='<p class="muted center">이름이 없어요. \'처음이에요\'로 가입해 주세요.</p>';
+  if(!q) out='<p class="muted center">이름을 검색해 주세요.</p>';
+  box.innerHTML=out;
+}
+function setAuthTab(t){ authTab=t; render(); }
+function identify(id){ f.loginPendingId=id; f.loginPin=''; render(); }
+function doLoginPin(){
+  var pin=f.loginPin.trim();
+  if(!pin){ toast('PIN을 입력해 주세요.','bad'); return; }
+  call('verifyMemberPin', f.loginPendingId, pin).then(function(ok){
+    if(!ok){ toast('PIN이 올바르지 않아요.','bad'); f.loginPin=''; render(); return; }
+    myId=f.loginPendingId; try{localStorage.setItem('c1_myId',myId);}catch(e){}
+    f.loginPendingId=''; f.loginPin=''; recomputeMe(); pview='home'; render();
+    toast('로그인됐어요!');
+  }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+function logout(){ myId=null; me=null; window.__myPurchases=null; try{localStorage.removeItem('c1_myId');}catch(e){} render(); }
+function doRegister(){
+  if(!f.regName.trim()||!f.regTeam){ toast('이름과 팀을 확인해 주세요.','bad'); return; }
+  if(!f.regPin.trim()||f.regPin.trim().length<4){ toast('PIN을 4자리 이상 입력해 주세요.','bad'); return; }
+  call('register', f.regName, f.regSoon, f.regPhone, f.regTeam, f.regPin).then(function(m){
+    myId=m.id; try{localStorage.setItem('c1_myId',m.id);}catch(e){}
+    f.regName=f.regSoon=f.regPhone=f.regTeam=f.regPin='';
+    return refresh(true);
+  }).then(function(){ toast('가입 완료!'); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+
+// ---------- participant: home ----------
+function participantView(){
+  var c=teamColor(me.teamId);
+  var teamsRanked=S.teams.map(function(t){return {id:t.id,name:t.name,color:t.color,total:teamTotal(t.id)};}).sort(function(a,b){return b.total-a.total;});
+  var myTeamRank=1; for(var i=0;i<teamsRanked.length;i++){ if(teamsRanked[i].id===me.teamId){ myTeamRank=i+1; break; } }
+  var membersRanked=S.members.slice().sort(function(a,b){return b.talents-a.talents;});
+  var myRank=1; for(var j=0;j<membersRanked.length;j++){ if(membersRanked[j].id===me.id){ myRank=j+1; break; } }
+  var h='<div class="me-card" style="--c:'+c+'"><div class="me-top"><span class="dot" style="background:'+c+'"></span>'
+    + '<span class="me-name">'+esc(me.name)+'</span><span class="me-team">'+esc(teamNameOf(me.teamId))+(me.soon?' · '+esc(me.soon):'')+'</span></div>'
+    + '<div class="me-talents">'+fmt(me.talents)+'<span class="unit">달란트</span></div>'
+    + '<div class="me-stats"><span>내 순위 <b>'+myRank+'위</b> / '+S.members.length+'명</span>'
+    + '<span>우리 팀 <b>'+myTeamRank+'위</b> · '+fmt(teamTotal(me.teamId))+'달란트</span></div></div>';
+  h+='<div class="tabs">'
+    + '<button class="'+(pview==='home'?'on':'')+'" onclick="setPview(\'home\')">순위</button>'
+    + '<button class="'+(pview==='give'?'on':'')+'" onclick="setPview(\'give\')">팀원에게 주기</button>'
+    + '<button class="'+(pview==='market'?'on':'')+'" onclick="setPview(\'market\')">달란트 시장</button></div>';
+  if(pview==='home') h+=boards(me.teamId, me.id);
+  else if(pview==='give') h+=giveView();
+  else h+=marketBrowse();
+  return h;
+}
+function setPview(v){ pview=v; if(v==='market') loadMyPurchases(); render(); }
+
+function boards(hiTeam, hiMember){
+  var medals=['🥇','🥈','🥉'];
+  var h='<div class="seg"><button class="'+(boardSeg==='team'?'on':'')+'" onclick="boardSeg=\'team\';render()">팀 순위</button>'
+    + '<button class="'+(boardSeg==='indiv'?'on':'')+'" onclick="boardSeg=\'indiv\';render()">개인 순위</button></div><div class="rank-list">';
+  if(boardSeg==='team'){
+    var tr=S.teams.map(function(t){return {id:t.id,name:t.name,color:t.color,total:teamTotal(t.id)};}).sort(function(a,b){return b.total-a.total;});
+    var top=tr.length?tr[0].total:0;
+    for(var i=0;i<tr.length;i++){ var t=tr[i];
+      h+='<div class="rank-card '+(t.id===hiTeam?'mine':'')+'" style="--c:'+t.color+'"><span class="rk">'+(medals[i]||(i+1))+'</span>'
+        +'<span class="dot" style="background:'+t.color+'"></span><span class="rk-name">'+esc(t.name)+'</span>'
+        +'<div class="rk-bar"><span style="width:'+(top?(t.total/top*100):0)+'%;background:'+t.color+'"></span></div>'
+        +'<span class="rk-val">'+fmt(t.total)+'</span></div>';
+    }
+    if(tr.length===0) h+='<p class="muted center">아직 팀이 없어요.</p>';
+  } else {
+    var mr=S.members.slice().sort(function(a,b){return b.talents-a.talents;}).slice(0,40);
+    var topm=mr.length?mr[0].talents:0;
+    for(var k=0;k<mr.length;k++){ var m=mr[k]; var c=teamColor(m.teamId);
+      h+='<div class="rank-card '+(m.id===hiMember?'mine':'')+'" style="--c:'+c+'"><span class="rk">'+(medals[k]||(k+1))+'</span>'
+        +'<span class="dot" style="background:'+c+'"></span><span class="rk-name">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span>'
+        +'<div class="rk-bar"><span style="width:'+(topm?(m.talents/topm*100):0)+'%;background:'+c+'"></span></div>'
+        +'<span class="rk-val">'+fmt(m.talents)+'</span></div>';
+    }
+    if(mr.length===0) h+='<p class="muted center">아직 참가자가 없어요.</p>';
+  }
+  return h+'</div>';
+}
+
+function giveView(){
+  if(!me.teamId) return '<div class="empty"><p>팀이 배정되어야 주고받을 수 있어요.</p></div>';
+  var mates=S.members.filter(function(m){return m.teamId===me.teamId && m.id!==me.id;});
+  if(mates.length===0) return '<div class="empty"><p>같은 팀에 다른 팀원이 아직 없어요.</p></div>';
+  var c=teamColor(me.teamId);
+  var h='<div class="panel"><p class="hint">같은 팀원에게 내 달란트를 나눠줄 수 있어요. (보유 '+fmt(me.talents)+')</p>'
+    + '<label class="field-label">받는 팀원</label><div class="team-pills">';
+  for(var i=0;i<mates.length;i++){ var m=mates[i];
+    h+='<button class="pill '+(f.giveSel===m.id?'on':'')+'" style="--c:'+c+'" onclick="f.giveSel=\''+m.id+'\';render()">'+esc(m.name)+' <em>'+fmt(m.talents)+'</em></button>';
+  }
+  h+='</div><label class="field-label">보낼 달란트</label><div class="row">'
+    + '<input class="input" type="number" min="1" value="'+esc(f.giveAmt)+'" oninput="f.giveAmt=this.value" placeholder="수량">'
+    + '<button class="btn btn-primary" onclick="doGive()">보내기</button></div></div>';
+  return h;
+}
+function doGive(){
+  var amt=Math.round(Number(f.giveAmt));
+  if(!f.giveSel||!(amt>0)){ toast('받는 팀원과 수량을 확인해 주세요.','bad'); return; }
+  if(amt>me.talents){ toast('달란트가 부족해요.','bad'); return; }
+  call('transfer', me.id, f.giveSel, amt).then(function(){
+    f.giveAmt=''; f.giveSel=''; return refresh(true);
+  }).then(function(){ toast('전달 완료!','buy'); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+
+function marketBrowse(){
+  if(S.items.length===0) return '<div class="empty"><p>아직 시장에 상품이 없어요.</p></div>';
+  var h='<div class="panel"><p class="hint">사고 싶은 상품의 구매 버튼을 누르면 내 달란트에서 바로 차감돼요. 내 보유: <b>'+fmt(me.talents)+'</b> 달란트</p><div class="market-grid">';
+  for(var i=0;i<S.items.length;i++){ var it=S.items[i];
+    var ok = it.stock>0 && me.talents>=it.price;
+    var label = it.stock<=0?'품절':(me.talents<it.price?'부족':'구매');
+    h+='<div class="item-card '+(it.stock<=0?'out':'')+'"><div class="item-emoji">'+esc(it.emoji)+'</div><div class="item-name">'+esc(it.name)+'</div>'
+      +'<div class="item-price"><span class="coin" style="width:16px;height:16px;font-size:8px">D</span> '+fmt(it.price)+'</div>'
+      +'<div class="item-stock">'+(it.stock>0?'남은 수량 '+it.stock:'품절')+'</div>'
+      +'<button class="btn btn-buy" '+(ok?'':'disabled')+' onclick="doSelfBuy(\''+it.id+'\')">'+label+'</button></div>';
+  }
+  h+='</div>';
+  var mine = window.__myPurchases;
+  h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">내 구매 내역 · 배부 상태</div>';
+  if(!mine){ h+='<p class="muted small">불러오는 중…</p>'; }
+  else if(mine.length===0){ h+='<p class="muted small">아직 구매한 상품이 없어요.</p>'; }
+  else {
+    for(var k=0;k<mine.length;k++){ var p=mine[k];
+      var badge = p.done ? '<span class="badge ok">받음</span>' : '<span class="badge wait">대기중</span>';
+      h+='<div class="mini-row"><span class="grow1 lbl">'+esc(p.item)+'</span><span class="spend">-'+fmt(p.price)+'</span>'+badge+'</div>';
+    }
+  }
+  h+='</div>';
+  return h+'</div>';
+}
+function doSelfBuy(itemId){
+  var it=null; for(var i=0;i<S.items.length;i++) if(S.items[i].id===itemId) it=S.items[i];
+  if(!it) return;
+  if(!confirm(it.name+' 을(를) '+fmt(it.price)+' 달란트로 구매할까요?')) return;
+  call('selfBuy', me.id, itemId).then(function(){ return refresh(true); })
+    .then(function(){ toast('구매 완료! '+it.name,'buy'); loadMyPurchases(); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+function loadMyPurchases(){
+  if(!me) return;
+  call('getMyPurchases', me.id).then(function(arr){ window.__myPurchases=arr; if(!typing) render(); }).catch(function(){});
+}
+
+// ---------- admin ----------
+function goAdmin(){ mode='admin'; render(); }
+function goParticipant(){ mode='participant'; render(); }
+function pinView(){
+  return '<div class="panel narrow-panel"><h2 class="panel-title">관리자 확인</h2><p class="muted">PIN을 입력하세요</p>'
+    + '<input class="input" id="pinInput" type="password" placeholder="••••" onkeydown="if(event.key===\'Enter\')submitPin()">'
+    + '<div class="row" style="margin-top:14px"><button class="btn btn-ghost" onclick="goParticipant()">취소</button>'
+    + '<button class="btn btn-primary" onclick="submitPin()">확인</button></div></div>';
+}
+function submitPin(){
+  var v=document.getElementById('pinInput').value;
+  call('verifyPin', v).then(function(ok){
+    if(ok){ adminPin=v; aview='earn'; render(); } else { toast('PIN이 올바르지 않습니다.','bad'); }
+  });
+}
+function setAview(v){ aview=v; if(v==='dist'){ loadPurchases(); } render(); }
+function adminView(){
+  var tabs=[['earn','적립'],['members','멤버'],['teams','팀'],['market','시장'],['dist','배부'],['settings','설정']];
+  var h='<div class="tabs">';
+  for(var i=0;i<tabs.length;i++) h+='<button class="'+(aview===tabs[i][0]?'on':'')+'" onclick="setAview(\''+tabs[i][0]+'\')">'+tabs[i][1]+'</button>';
+  h+='</div>';
+  if(aview==='earn') h+=adminEarn();
+  else if(aview==='members') h+=adminMembers();
+  else if(aview==='teams') h+=adminTeams();
+  else if(aview==='market') h+=adminMarket();
+  else if(aview==='dist') h+=adminDistribute();
+  else h+=adminSettings();
+  return h;
+}
+
+function memberPickerHtml(listId, q, selId, onpickFn){
+  var arr=S.members.filter(function(m){ return m.name.indexOf(q)>=0 || (m.soon||'').indexOf(q)>=0; })
+    .sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).slice(0,50);
+  var out='';
+  for(var i=0;i<arr.length;i++){ var m=arr[i];
+    out+='<button class="picker-item '+(selId===m.id?'on':'')+'" onclick="'+onpickFn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
+      +'<span class="grow">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span><span class="muted">'+fmt(m.talents)+'</span></button>';
+  }
+  if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
+  return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
+}
+
+function adminEarn(){
+  var m=memberById(f.earnSel);
+  var quick=[10,20,30,50,100];
+  var h='<div class="panel"><h2 class="panel-title">달란트 적립 / 수정</h2><label class="field-label">참가자 선택</label>'
+    + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.earnQ)+'" oninput="f.earnQ=this.value;fillList(\'earnList\',f.earnQ,f.earnSel,\'pickEarn\')">'
+    + memberPickerHtml('earnList', f.earnQ, f.earnSel, 'pickEarn');
+  if(m) h+='<div class="balance">'+esc(m.name)+' · '+esc(teamNameOf(m.teamId))+' · 보유 <b>'+fmt(m.talents)+'</b></div>';
+  h+='<label class="field-label">미션 / 사유 (선택)</label><input class="input" value="'+esc(f.earnLabel)+'" oninput="f.earnLabel=this.value" placeholder="예: 새벽기도 참석">'
+    + '<label class="field-label">빠른 적립</label><div class="quick-row">';
+  for(var i=0;i<quick.length;i++) h+='<button class="quick" '+(m?'':'disabled')+' onclick="doEarn('+quick[i]+')">+'+quick[i]+'</button>';
+  h+='</div><label class="field-label">직접 입력 · 차감하려면 마이너스 (예: -50)</label><div class="row">'
+    + '<input class="input" type="number" value="'+esc(f.earnAmt)+'" oninput="f.earnAmt=this.value" placeholder="예: 50 또는 -50">'
+    + '<button class="btn btn-primary" '+(m?'':'disabled')+' onclick="doEarn()">반영</button></div>';
+  if(m){
+    h+='<label class="field-label">정확한 값으로 수정 (현재 '+fmt(m.talents)+')</label><div class="row">'
+      + '<input class="input" type="number" value="'+esc(f.setVal)+'" oninput="f.setVal=this.value" placeholder="정확한 달란트 수">'
+      + '<button class="btn btn-ghost" onclick="doSetTalents()">이 값으로 수정</button></div>';
+  }
+  var sel=f.earnSel;
+  var feed, hdr;
+  if(sel){
+    feed=S.log.filter(function(l){ return l.memberId===sel || (l.type==='transfer'&&l.ref===sel); }).slice(0,15);
+    hdr=(m?esc(m.name)+'님 ':'')+'적립 기록';
+  } else {
+    feed=S.log.slice(0,10);
+    hdr='최근 기록 (취소로 되돌리기)';
+  }
+  h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">'+hdr+'</div>';
+  for(var k=0;k<feed.length;k++){ var l=feed[k];
+    var received = !!sel && l.type==='transfer' && l.ref===sel;
+    var sign, cls, amt, lbl;
+    if(received){ sign='+'; cls='earn'; amt=fmt(Math.abs(l.amount)); lbl='받음 · '+esc(l.memberName); }
+    else if(l.type==='earn'){ sign='+'; cls='earn'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'미션'); }
+    else if(l.type==='adjust'){ var pos=Number(l.amount)>=0; sign=pos?'+':''; cls=pos?'earn':'spend'; amt=fmt(l.amount); lbl=esc(l.label||'수정'); }
+    else if(l.type==='spend'){ sign='-'; cls='spend'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'구매'); }
+    else { sign='-'; cls='spend'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'전달'); }
+    var first = sel ? '<span class="grow1 lbl">'+lbl+'</span>'
+                    : '<span class="grow1">'+esc(l.memberName)+'</span><span class="muted lbl">'+lbl+'</span>';
+    h+='<div class="mini-row">'+first
+      +'<span class="'+cls+'">'+sign+amt+'</span>'
+      + (l.id?'<button class="x" onclick="doUndo(\''+l.id+'\')">취소</button>':'') +'</div>';
+  }
+  if(feed.length===0) h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';
+  h+='</div></div>';
+  return h;
+}
+function fillList(id,q,sel,fn){
+  var box=document.getElementById(id); if(!box) return;
+  var arr=S.members.filter(function(m){ return m.name.indexOf(q.trim())>=0 || (m.soon||'').indexOf(q.trim())>=0; })
+    .sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).slice(0,50);
+  var out='';
+  for(var i=0;i<arr.length;i++){ var m=arr[i];
+    out+='<button class="picker-item '+(sel===m.id?'on':'')+'" onclick="'+fn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
+      +'<span class="grow">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span><span class="muted">'+fmt(m.talents)+'</span></button>';
+  }
+  if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
+  box.innerHTML=out;
+}
+function pickEarn(id){ f.earnSel=id; render(); }
+function doEarn(q){
+  var a = (q!=null)? q : Math.round(Number(f.earnAmt));
+  if(!f.earnSel||!a){ toast('대상과 수량을 확인해 주세요.','bad'); return; }
+  call('earn', adminPin, f.earnSel, a, f.earnLabel).then(function(m){
+    f.earnAmt=''; f.earnLabel=''; return refresh(true);
+  }).then(function(){ toast('반영 완료! '+(a>0?'+':'')+fmt(a)); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+function doSetTalents(){
+  if(!f.earnSel || f.setVal===''){ toast('수정할 값을 입력해 주세요.','bad'); return; }
+  var v=Math.round(Number(f.setVal));
+  call('setTalents', adminPin, f.earnSel, v).then(function(){
+    f.setVal=''; return refresh(true);
+  }).then(function(){ toast('수정 완료! → '+fmt(v)); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+function doUndo(id){
+  if(!confirm('이 기록을 취소(되돌리기)할까요?')) return;
+  call('undoEntry', adminPin, id).then(function(){ return refresh(true); })
+    .then(function(){ toast('취소했어요.'); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+
+function adminMembers(){
+  var arr=S.members.filter(function(m){ var q=f.memQ.trim(); return m.name.indexOf(q)>=0||(m.soon||'').indexOf(q)>=0; })
+    .sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+  var h='<div class="panel"><h2 class="panel-title">멤버 · '+S.members.length+'명</h2>'
+    + '<p class="hint">전화번호는 \'멤버 정보 불러오기\'를 눌러야 표시돼요(관리자만).</p>'
+    + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.memQ)+'" oninput="f.memQ=this.value;render()">'
+    + '<button class="btn btn-ghost" style="margin-top:10px" onclick="loadPhones()">전화번호 불러오기</button>'
+    + '<div class="list" style="margin-top:12px">';
+  var phones = window.__phones || {};
+  for(var i=0;i<arr.length;i++){ var m=arr[i];
+    var opts='<option value="">미배정</option>';
+    for(var j=0;j<S.teams.length;j++){ var t=S.teams[j]; opts+='<option value="'+t.id+'" '+(m.teamId===t.id?'selected':'')+'>'+esc(t.name)+'</option>'; }
+    h+='<div class="member-row"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
+      +'<div class="m-info"><span class="m-name">'+esc(m.name)+' <em>'+esc(m.soon)+'</em></span>'
+      +'<span class="muted small">'+esc(phones[m.id]||'번호: 미표시')+' · '+fmt(m.talents)+' 달란트</span></div>'
+      +'<select class="mini-select" onchange="setMemTeam(\''+m.id+'\',this.value)">'+opts+'</select>'
+      +'<button class="x" style="color:var(--mute);margin-right:2px" onclick="adminResetPin(\''+m.id+'\',\''+esc(m.name)+'\')">PIN</button>'
+      +'<button class="x" onclick="delMember(\''+m.id+'\',\''+esc(m.name)+'\')">삭제</button></div>';
+  }
+  if(arr.length===0) h+='<p class="muted center">참가자가 없습니다.</p>';
+  return h+'</div></div>';
+}
+function loadPhones(){
+  call('getAdminData', adminPin).then(function(d){
+    var ph={}; for(var i=0;i<d.members.length;i++) ph[d.members[i].id]=d.members[i].phone||'번호 미입력';
+    window.__phones=ph; render(); toast('전화번호를 불러왔어요.');
+  }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+function setMemTeam(id,tid){ call('setMemberTeam', adminPin, id, tid).then(function(){ return refresh(true); }).catch(function(e){toast(e.message||e,'bad');}); }
+function delMember(id,name){ if(!confirm(name+' 님을 삭제할까요?')) return; call('removeMember', adminPin, id).then(function(){ return refresh(true); }).then(function(){toast('삭제했어요.');}).catch(function(e){toast(e.message||e,'bad');}); }
+function adminResetPin(id,name){
+  var np=prompt(name+' 님의 PIN을 새로 설정해 주세요 (4자리 이상):');
+  if(!np||np.trim().length<4){ if(np!==null) toast('4자리 이상 입력해 주세요.','bad'); return; }
+  call('resetMemberPin', adminPin, id, np.trim()).then(function(){ toast(name+' PIN 재설정 완료!'); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+
+function adminTeams(){
+  var h='<div class="panel"><h2 class="panel-title">팀 · '+S.teams.length+'팀</h2>'
+    + '<label class="field-label">번호로 한 번에 만들기</label><div class="row">'
+    + '<input class="input narrow" type="number" min="1" max="20" value="'+esc(f.genN)+'" oninput="f.genN=this.value" placeholder="개수 (예:19)">'
+    + '<input class="input narrow" value="'+esc(f.genSuf)+'" oninput="f.genSuf=this.value" placeholder="단위">'
+    + '<button class="btn btn-primary" onclick="genTeams()">생성</button></div>'
+    + '<label class="field-label">이름으로 추가 (쉼표로 여러 개)</label><div class="row">'
+    + '<input class="input" value="'+esc(f.teamNames)+'" oninput="f.teamNames=this.value" placeholder="사자팀, 어린양팀">'
+    + '<button class="btn btn-ghost" onclick="addTeamsByName()">추가</button></div><div class="list">';
+  for(var i=0;i<S.teams.length;i++){ var t=S.teams[i];
+    var cnt=S.members.filter(function(m){return m.teamId===t.id;}).length;
+    h+='<div class="list-row"><span class="dot" style="background:'+t.color+'"></span><span class="grow">'+esc(t.name)+'</span>'
+      +'<span class="muted">'+cnt+'명 · '+fmt(teamTotal(t.id))+'달란트</span>'
+      +'<button class="x" onclick="delTeam(\''+t.id+'\',\''+esc(t.name)+'\')">삭제</button></div>';
+  }
+  if(S.teams.length===0) h+='<p class="muted">팀이 없습니다.</p>';
+  return h+'</div></div>';
+}
+function genTeams(){
+  var n=Math.min(20, Math.round(Number(f.genN))); if(!(n>0)){ toast('개수를 확인해 주세요.','bad'); return; }
+  var suf=f.genSuf.trim()||'팀'; var names=[]; for(var i=1;i<=n;i++) names.push(i+suf);
+  call('addTeams', adminPin, names).then(function(){ f.genN=''; return refresh(true); }).then(function(){toast(n+'개 팀 생성!');}).catch(function(e){toast(e.message||e,'bad');});
+}
+function addTeamsByName(){
+  var names=f.teamNames.split(/[,\n]/).map(function(s){return s.trim();}).filter(Boolean);
+  if(names.length===0) return;
+  call('addTeams', adminPin, names).then(function(){ f.teamNames=''; return refresh(true); }).then(function(){toast('추가했어요.');}).catch(function(e){toast(e.message||e,'bad');});
+}
+function delTeam(id,name){ if(!confirm(name+' 팀을 삭제할까요? (소속 인원은 미배정 처리)')) return; call('removeTeam', adminPin, id).then(function(){ return refresh(true); }).catch(function(e){toast(e.message||e,'bad');}); }
+
+function adminMarket(){
+  var m=memberById(f.buySel);
+  var h='<div class="panel"><h2 class="panel-title">달란트 시장 (구매 처리)</h2><label class="field-label">구매할 참가자</label>'
+    + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.buyQ)+'" oninput="f.buyQ=this.value;fillList(\'buyList\',f.buyQ,f.buySel,\'pickBuy\')">'
+    + memberPickerHtml('buyList', f.buyQ, f.buySel, 'pickBuy');
+  if(m) h+='<div class="balance">'+esc(m.name)+' · 보유 <b>'+fmt(m.talents)+'</b></div>';
+  h+='<div class="market-grid" style="margin-top:10px">';
+  for(var i=0;i<S.items.length;i++){ var it=S.items[i]; var ok=m&&m.talents>=it.price&&it.stock>0;
+    h+='<div class="item-card '+(it.stock<=0?'out':'')+'"><button class="item-del" onclick="delItem(\''+it.id+'\')">×</button>'
+      +'<div class="item-emoji">'+esc(it.emoji)+'</div><div class="item-name">'+esc(it.name)+'</div>'
+      +'<div class="item-price"><span class="coin" style="width:16px;height:16px;font-size:8px">D</span> '+fmt(it.price)+'</div>'
+      +'<div class="item-stock">'+(it.stock>0?'남은 수량 '+it.stock:'품절')+'</div>'
+      +'<button class="btn btn-buy" '+(ok?'':'disabled')+' onclick="doBuy(\''+it.id+'\')">'+(it.stock<=0?'품절':(!m?'참가자 선택':(ok?'구매':'부족')))+'</button></div>';
+  }
+  if(S.items.length===0) h+='<p class="muted">상품을 추가해 주세요.</p>';
+  h+='</div><h3 class="sub">상품 추가</h3><div class="row wrap">'
+    + '<input class="input" style="flex:0 0 56px;text-align:center" maxlength="2" value="'+esc(f.iEmoji)+'" oninput="f.iEmoji=this.value" placeholder="🎁">'
+    + '<input class="input" value="'+esc(f.iName)+'" oninput="f.iName=this.value" placeholder="상품 이름">'
+    + '<input class="input narrow" type="number" value="'+esc(f.iPrice)+'" oninput="f.iPrice=this.value" placeholder="가격">'
+    + '<input class="input narrow" type="number" value="'+esc(f.iStock)+'" oninput="f.iStock=this.value" placeholder="수량">'
+    + '<button class="btn btn-primary" onclick="addItemGo()">추가</button></div></div>';
+  return h;
+}
+function pickBuy(id){ f.buySel=id; render(); }
+function doBuy(itemId){
+  if(!f.buySel){ toast('참가자를 먼저 선택해 주세요.','bad'); return; }
+  call('buy', adminPin, f.buySel, itemId).then(function(){ return refresh(true); }).then(function(){toast('구매 완료!','buy');}).catch(function(e){toast(e.message||e,'bad');});
+}
+function addItemGo(){
+  if(!f.iName.trim()||!f.iPrice||!f.iStock){ toast('상품 정보를 확인해 주세요.','bad'); return; }
+  call('addItem', adminPin, f.iName, f.iPrice, f.iStock, f.iEmoji).then(function(){ f.iName=f.iPrice=f.iStock=f.iEmoji=''; return refresh(true); }).then(function(){toast('상품 추가!');}).catch(function(e){toast(e.message||e,'bad');});
+}
+function delItem(id){ call('removeItem', adminPin, id).then(function(){ return refresh(true); }).catch(function(e){toast(e.message||e,'bad');}); }
+
+function adminDistribute(){
+  var arr=window.__purchases;
+  var h='<div class="panel"><h2 class="panel-title">배부 (구매 내역)</h2>'
+    + '<button class="btn btn-ghost" onclick="loadPurchases()">새로고침</button>';
+  if(!arr){ return h+'<p class="muted center" style="margin-top:16px">불러오는 중…</p></div>'; }
+  var undone=arr.filter(function(p){return !p.done;});
+  var byItem={}; for(var i=0;i<undone.length;i++){ byItem[undone[i].item]=(byItem[undone[i].item]||0)+1; }
+  var sum=''; for(var k in byItem){ sum+='<span class="chip">'+esc(k)+' × '+byItem[k]+'</span>'; }
+  h+='<div class="chips" style="margin:12px 0">'+(sum||'<span class="muted">배부할 항목이 없어요.</span>')+'</div>';
+  h+='<div class="seg">'
+    + '<button class="'+(f.distFilter==='undone'?'on':'')+'" onclick="f.distFilter=\'undone\';render()">미배부 ('+undone.length+')</button>'
+    + '<button class="'+(f.distFilter==='done'?'on':'')+'" onclick="f.distFilter=\'done\';render()">완료 ('+(arr.length-undone.length)+')</button>'
+    + '<button class="'+(f.distFilter==='all'?'on':'')+'" onclick="f.distFilter=\'all\';render()">전체 ('+arr.length+')</button></div>';
+  h+='<input class="input" placeholder="이름/상품 검색" value="'+esc(f.distQ)+'" oninput="f.distQ=this.value;render()">';
+  var q=f.distQ.trim();
+  var list=arr.filter(function(p){
+    if(f.distFilter==='undone'&&p.done) return false;
+    if(f.distFilter==='done'&&!p.done) return false;
+    if(q && p.name.indexOf(q)<0 && p.item.indexOf(q)<0) return false;
+    return true;
+  });
+  h+='<div class="list" style="margin-top:12px">';
+  for(var j=0;j<list.length;j++){ var p=list[j];
+    h+='<div class="member-row'+(p.done?' done':'')+'"><div class="m-info"><span class="m-name">'+esc(p.item)+'</span>'
+      +'<span class="muted small">'+esc(p.name)+' · '+esc(p.team)+' · '+fmt(p.price)+'D</span></div>'
+      +'<button class="btn '+(p.done?'btn-ghost':'btn-primary')+'" onclick="toggleDone(\''+p.id+'\','+(p.done?'false':'true')+')">'+(p.done?'배부취소':'배부완료')+'</button></div>';
+  }
+  if(list.length===0) h+='<p class="muted center">해당 내역이 없어요.</p>';
+  return h+'</div></div>';
+}
+function loadPurchases(){
+  if(!adminPin) return;
+  call('getPurchases', adminPin).then(function(arr){ window.__purchases=arr; if(!typing) render(); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+function toggleDone(id, done){
+  if(window.__purchases){ for(var i=0;i<window.__purchases.length;i++) if(window.__purchases[i].id===id) window.__purchases[i].done=done; }
+  render();
+  call('markPurchaseDone', adminPin, id, done).catch(function(e){ toast(e.message||e,'bad'); loadPurchases(); });
+}
+function adminSettings(){
+  if(f.setTitle==='') f.setTitle=S.title;
+  return '<div class="panel"><h2 class="panel-title">설정</h2>'
+    + '<label class="field-label">행사 제목</label><input class="input" value="'+esc(f.setTitle)+'" oninput="f.setTitle=this.value">'
+    + '<label class="field-label">새 관리자 PIN (바꿀 때만 입력)</label><div class="row">'
+    + '<input class="input narrow" value="'+esc(f.setPin)+'" oninput="f.setPin=this.value" placeholder="새 PIN">'
+    + '<button class="btn btn-ghost" onclick="saveMeta()">저장</button></div>'
+    + '<h3 class="sub">회원가입</h3><div class="row"><span class="muted">현재: '+(S.open?'열림':'닫힘')+'</span>'
+    + '<button class="btn btn-ghost" onclick="toggleOpen()">'+(S.open?'가입 닫기':'가입 열기')+'</button></div>'
+    + '<h3 class="sub danger-title">초기화</h3>'
+    + '<button class="btn btn-ghost danger" onclick="doReset()">모든 데이터 초기화</button>'
+    + '<p class="hint" style="margin-top:14px">데이터는 Vercel KV에 저장됩니다.</p></div>';
+}
+function saveMeta(){
+  call('setMeta', adminPin, {title:f.setTitle, newPin:f.setPin}).then(function(){
+    if(f.setPin.trim()) adminPin=f.setPin.trim();
+    f.setPin=''; return refresh(true);
+  }).then(function(){toast('저장했어요.');}).catch(function(e){toast(e.message||e,'bad');});
+}
+function toggleOpen(){ call('setMeta', adminPin, {open:!S.open}).then(function(){ return refresh(true); }).catch(function(e){toast(e.message||e,'bad');}); }
+function doReset(){
+  if(!confirm('정말 모든 데이터를 초기화할까요? (멤버·팀·달란트·상품 삭제)')) return;
+  call('resetAll', adminPin).then(function(){ window.__phones={}; window.__purchases=null; return refresh(true); }).then(function(){toast('초기화 완료.');}).catch(function(e){toast(e.message||e,'bad');});
+}
 </script>
 </body>
 </html>
