@@ -147,7 +147,7 @@ var f = {
   memQ:'',
   genN:'', genSuf:'팀', teamNames:'',
   iEmoji:'', iName:'', iPrice:'', iStock:'', iEmojiPicker:false,
-  pickerTeam:'', memTeam:'', earnLogMore:false,
+  pickerTeam:'', memTeam:'', earnLogMore:0,
   distFilter:'undone', distQ:'',
   setTitle:'', setPin:''
 };
@@ -442,9 +442,7 @@ function memberPickerHtml(listId, q, selId, onpickFn){
   }
   return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
 }
-function setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=false; render(); }
-
-function adminEarn(){
+funcfunction setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=0; render(); }nction adminEarn(){
   var m=memberById(f.earnSel);
   var quick=[10,20,30,50,100];
   var earnTeam=f.pickerTeam?S.teams.filter(function(t){return t.id===f.pickerTeam;})[0]:null;
@@ -479,8 +477,7 @@ function adminEarn(){
     feed=S.log;
     hdr='최근 기록 (취소로 되돌리기)';
   }
-  var maxShow=f.earnLogMore?feed.length:10;
-  var shown=feed.slice(0,maxShow);
+  va  var maxShow=10+f.earnLogMore;ar shown=feed.slice(0,maxShow);
   h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">'+hdr+'</div>';
   for(var k=0;k<shown.length;k++){ var l=shown[k];
     var received = !!sel && l.type==='transfer' && l.ref===sel;
@@ -496,8 +493,7 @@ function adminEarn(){
       + (l.id?'<button class="x" onclick="doUndo(\''+l.id+'\')">취소</button>':'') +'</div>';
   }
   if(shown.length===0) h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';
-  if(!f.earnLogMore && feed.length>10) h+='<button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:13px" onclick="f.earnLogMore=true;render()">+ 더보기 ('+(feed.length-10)+'개 더)</button>';
-  h+='</div></div>';
+  if(!f.earnLogM  if(maxShow<feed.length) h+='<button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:13px" onclick="f.earnLogMore+=5;render()">+ 더보기 ('+(feed.length-maxShow)+'개 더)</button>';iv>';
   return h;
 }
 function fillList(id,q,sel,fn){
@@ -512,9 +508,7 @@ function fillList(id,q,sel,fn){
   if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
   box.innerHTML=out;
 }
-function pickEarn(id){ f.earnSel=id; f.earnLogMore=false; render(); }
-function doEarn(q){
-  var a = (q!=null)? q : Math.round(Number(f.earnAmt));
+function pickEarn(id){ f.efunction pickEarn(id){ f.earnSel=id; f.earnLogMore=0; render(); } a = (q!=null)? q : Math.round(Number(f.earnAmt));
   if(!f.earnSel||!a){ toast('대상과 수량을 확인해 주세요.','bad'); return; }
   call('earn', adminPin, f.earnSel, a, f.earnLabel).then(function(m){
     f.earnAmt=''; f.earnLabel=''; return refresh(true);
