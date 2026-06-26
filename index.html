@@ -551,8 +551,14 @@ function adminMembers(){
     }
     if(teams.length===0) h+='<p class="muted center">팀이 없습니다.</p>';
   } else {
+    var memTeamObj=S.teams.filter(function(t){return t.id===f.memTeam;})[0];
+    var leaderName=memTeamObj?memTeamObj.name.replace(/\s*순\s*$/,''):'';
     var teamMembers=S.members.filter(function(m){return m.teamId===f.memTeam;})
-      .sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+      .sort(function(a,b){
+        var aL=a.name===leaderName?0:1, bL=b.name===leaderName?0:1;
+        if(aL!==bL) return aL-bL;
+        return a.name.localeCompare(b.name,'ko');
+      });
     for(var mi=0;mi<teamMembers.length;mi++) h+=memberRow(teamMembers[mi],phones);
     if(teamMembers.length===0) h+='<p class="muted center">이 순에 참가자가 없습니다.</p>';
   }
