@@ -207,7 +207,7 @@ function render(){
 function topbar(){
   var right = '';
   if(mode==='participant'){
-    if(me) right += '<button class="link-btn" onclick="logout()">나가기</button>';
+    if(me) right += '<button class="link-btn" onclick="logout()">로그아웃</button>';
     right += '<button class="link-btn admin" onclick="goAdmin()">관리자</button>';
   } else {
     right += '<button class="link-btn" onclick="goParticipant()">← 참가자 화면</button>';
