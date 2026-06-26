@@ -147,7 +147,7 @@ var f = {
   memQ:'',
   genN:'', genSuf:'팀', teamNames:'',
   iEmoji:'', iName:'', iPrice:'', iStock:'', iEmojiPicker:false,
-  pickerTeam:'', memTeam:'',
+  pickerTeam:'', memTeam:'', earnLogMore:false,
   distFilter:'undone', distQ:'',
   setTitle:'', setPin:''
 };
@@ -442,7 +442,7 @@ function memberPickerHtml(listId, q, selId, onpickFn){
   }
   return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
 }
-function setPickerTeam(tid){ f.pickerTeam=tid; render(); }
+function setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=false; render(); }
 
 function adminEarn(){
   var m=memberById(f.earnSel);
@@ -466,16 +466,23 @@ function adminEarn(){
       + '<button class="btn btn-ghost" onclick="doSetTalents()">이 값으로 수정</button></div>';
   }
   var sel=f.earnSel;
+  var teamId=f.pickerTeam;
   var feed, hdr;
   if(sel){
-    feed=S.log.filter(function(l){ return l.memberId===sel || (l.type==='transfer'&&l.ref===sel); }).slice(0,15);
+    feed=S.log.filter(function(l){ return l.memberId===sel || (l.type==='transfer'&&l.ref===sel); });
     hdr=(m?esc(m.name)+'님 ':'')+'적립 기록';
+  } else if(teamId){
+    var teamMemberIds=S.members.filter(function(mb){return mb.teamId===teamId;}).map(function(mb){return mb.id;});
+    feed=S.log.filter(function(l){ return teamMemberIds.indexOf(l.memberId)>=0; });
+    hdr='이 순의 기록 (취소로 되돌리기)';
   } else {
-    feed=S.log.slice(0,10);
+    feed=S.log;
     hdr='최근 기록 (취소로 되돌리기)';
   }
+  var maxShow=f.earnLogMore?feed.length:10;
+  var shown=feed.slice(0,maxShow);
   h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">'+hdr+'</div>';
-  for(var k=0;k<feed.length;k++){ var l=feed[k];
+  for(var k=0;k<shown.length;k++){ var l=shown[k];
     var received = !!sel && l.type==='transfer' && l.ref===sel;
     var sign, cls, amt, lbl;
     if(received){ sign='+'; cls='earn'; amt=fmt(Math.abs(l.amount)); lbl='받음 · '+esc(l.memberName); }
@@ -488,7 +495,8 @@ function adminEarn(){
     h+='<div class="mini-row">'+first+'<span class="'+cls+'">'+sign+amt+'</span>'
       + (l.id?'<button class="x" onclick="doUndo(\''+l.id+'\')">취소</button>':'') +'</div>';
   }
-  if(feed.length===0) h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';
+  if(shown.length===0) h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';
+  if(!f.earnLogMore && feed.length>10) h+='<button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:13px" onclick="f.earnLogMore=true;render()">+ 더보기 ('+(feed.length-10)+'개 더)</button>';
   h+='</div></div>';
   return h;
 }
@@ -504,7 +512,7 @@ function fillList(id,q,sel,fn){
   if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
   box.innerHTML=out;
 }
-function pickEarn(id){ f.earnSel=id; render(); }
+function pickEarn(id){ f.earnSel=id; f.earnLogMore=false; render(); }
 function doEarn(q){
   var a = (q!=null)? q : Math.round(Number(f.earnAmt));
   if(!f.earnSel||!a){ toast('대상과 수량을 확인해 주세요.','bad'); return; }
