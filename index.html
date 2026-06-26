@@ -442,7 +442,7 @@ function memberPickerHtml(listId, q, selId, onpickFn){
   }
   return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
 }
-funcfunction setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=0; render(); }nction adminEarn(){
+function setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=0; render(); }nction adminEarn(){
   var m=memberById(f.earnSel);
   var quick=[10,20,30,50,100];
   var earnTeam=f.pickerTeam?S.teams.filter(function(t){return t.id===f.pickerTeam;})[0]:null;
