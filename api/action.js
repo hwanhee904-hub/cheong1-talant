@@ -69,6 +69,15 @@ const actions = {
     return trim_(pin) === trim_(s.pin);
   },
 
+  async loginByNamePin(name, pin) {
+    const s = await readState();
+    const matches = s.members.filter(m => trim_(m.name) === trim_(name));
+    if (matches.length === 0) throw new Error('이름을 찾을 수 없어요.');
+    const matched = matches.find(m => m.pin && trim_(m.pin) === trim_(pin));
+    if (!matched) throw new Error('이름 또는 PIN이 올바르지 않아요.');
+    return pubMember_(matched);
+  },
+
   async getAdminData(pin) {
     const s = await readState();
     checkPin_(s, pin);
