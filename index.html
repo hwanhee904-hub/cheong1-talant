@@ -97,6 +97,7 @@ body{margin:0;min-height:100vh;background:radial-gradient(120% 80% at 80% -10%,#
 .danger-title{color:var(--coral);}
 .chips{display:flex;flex-wrap:wrap;gap:6px;}
 .chip{background:var(--surf2);border:1px solid var(--line);border-radius:99px;padding:5px 11px;font-size:13px;font-weight:700;color:var(--gold);}
+.tab-badge{display:inline-flex;align-items:center;justify-content:center;background:#FF6B6B;color:#fff;font-size:10px;font-weight:800;border-radius:99px;min-width:16px;height:16px;padding:0 4px;margin-left:5px;vertical-align:middle;line-height:1;}
 .member-row.done{opacity:.55;}
 .member-row.done .m-name{text-decoration:line-through;}
 .member-row .btn{padding:8px 13px;font-size:13px;}
@@ -398,8 +399,12 @@ function submitPin(){
 function setAview(v){ aview=v; if(v==='dist'){ loadPurchases(); } render(); }
 function adminView(){
   var tabs=[['earn','적립'],['members','멤버'],['teams','팀'],['market','시장'],['dist','배부'],['settings','설정']];
+  var distBadge=(window.__purchases&&window.__purchases.filter(function(p){return !p.done&&!p.cancelled;}).length)||0;
   var h='<div class="tabs">';
-  for(var i=0;i<tabs.length;i++) h+='<button class="'+(aview===tabs[i][0]?'on':'')+'" onclick="setAview(\''+tabs[i][0]+'\')">'+tabs[i][1]+'</button>';
+  for(var i=0;i<tabs.length;i++){
+    var label=tabs[i][1]+(tabs[i][0]==='dist'&&distBadge>0?'<span class="tab-badge">'+distBadge+'</span>':'');
+    h+='<button class="'+(aview===tabs[i][0]?'on':'')+'" onclick="setAview('+String.fromCharCode(39)+tabs[i][0]+String.fromCharCode(39)+')">'+label+'</button>';
+  }
   h+='</div>';
   if(aview==='earn') h+=adminEarn();
   else if(aview==='members') h+=adminMembers();
