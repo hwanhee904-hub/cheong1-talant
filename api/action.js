@@ -320,18 +320,20 @@ const actions = {
   }
 };
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+export const config = { runtime: 'edge' };
 
-  const { fn, args = [] } = req.body;
-  if (!actions[fn]) return res.status(400).json({ error: `Unknown function: ${fn}` });
+export default async function handler(req) {
+  const h = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: h });
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: h });
+
+  const { fn, args = [] } = await req.json();
+  if (!actions[fn]) return new Response(JSON.stringify({ error: `Unknown function: ${fn}` }), { status: 400, headers: h });
 
   try {
     const data = await actions[fn](...args);
-    res.json({ data });
+    return new Response(JSON.stringify({ data }), { headers: h });
   } catch (e) {
-    res.json({ error: e.message || String(e) });
+    return new Response(JSON.stringify({ error: e.message || String(e) }), { headers: h });
   }
 }
