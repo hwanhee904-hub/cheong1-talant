@@ -174,7 +174,7 @@ function recomputeMe(){ me = myId ? memberById(myId) : null; if(myId && S && !me
 // ===== load + poll =====
 function refresh(initial){
   return call('getState').then(function(s){
-    S=s; recomputeMe();
+    S=s; S.teams.sort(function(a,b){ return a.name.localeCompare(b.name,'ko'); }); recomputeMe();
     if(initial || !typing) render();
   }).catch(function(e){ if(initial) document.getElementById('app').innerHTML='<div class="loading">연결 오류: '+esc(e.message||e)+'<br>새로고침 해주세요.</div>'; });
 }
