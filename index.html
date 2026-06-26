@@ -442,6 +442,53 @@ function memberPickerHtml(listId, q, selId, onpickFn){
   }
   return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
 }
+function setPickerTeam(tid){ f.pickerTeam=tid; render(); }
+
+function adminEarn(){
+  var m=memberById(f.earnSel);
+  var quick=[10,20,30,50,100];
+  var h='<div class="panel"><h2 class="panel-title">달란트 적립 / 수정</h2><label class="field-label">참가자 선택</label>'
+    + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.earnQ)+'" oninput="f.earnQ=this.value;fillList(\'earnList\',f.earnQ,f.earnSel,\'pickEarn\')">'
+    + memberPickerHtml('earnList', f.earnQ, f.earnSel, 'pickEarn');
+  if(m) h+='<div class="balance">'+esc(m.name)+' · '+esc(teamNameOf(m.teamId))+' · 보유 <b>'+fmt(m.talents)+'</b></div>';
+  h+='<label class="field-label">미션 / 사유 (선택)</label><input class="input" value="'+esc(f.earnLabel)+'" oninput="f.earnLabel=this.value" placeholder="예: 새벽기도 참석">'
+    + '<label class="field-label">빠른 적립</label><div class="quick-row">';
+  for(var i=0;i<quick.length;i++) h+='<button class="quick" '+(m?'':'disabled')+' onclick="doEarn('+quick[i]+')">+'+quick[i]+'</button>';
+  h+='</div><label class="field-label">직접 입력 · 차감하려면 마이너스 (예: -50)</label><div class="row">'
+    + '<input class="input" type="number" value="'+esc(f.earnAmt)+'" oninput="f.earnAmt=this.value" placeholder="예: 50 또는 -50">'
+    + '<button class="btn btn-primary" '+(m?'':'disabled')+' onclick="doEarn()">반영</button></div>';
+  if(m){
+    h+='<label class="field-label">정확한 값으로 수정 (현재 '+fmt(m.talents)+')</label><div class="row">'
+      + '<input class="input" type="number" value="'+esc(f.setVal)+'" oninput="f.setVal=this.value" placeholder="정확한 달란트 수">'
+      + '<button class="btn btn-ghost" onclick="doSetTalents()">이 값으로 수정</button></div>';
+  }
+  var sel=f.earnSel;
+  var feed, hdr;
+  if(sel){
+    feed=S.log.filter(function(l){ return l.memberId===sel || (l.type==='transfer'&&l.ref===sel); }).slice(0,15);
+    hdr=(m?esc(m.name)+'님 ':'')+'적립 기록';
+  } else {
+    feed=S.log.slice(0,10);
+    hdr='최근 기록 (취소로 되돌리기)';
+  }
+  h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">'+hdr+'</div>';
+  for(var k=0;k<feed.length;k++){ var l=feed[k];
+    var received = !!sel && l.type==='transfer' && l.ref===sel;
+    var sign, cls, amt, lbl;
+    if(received){ sign='+'; cls='earn'; amt=fmt(Math.abs(l.amount)); lbl='받음 · '+esc(l.memberName); }
+    else if(l.type==='earn'){ sign='+'; cls='earn'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'미션'); }
+    else if(l.type==='adjust'){ var pos=Number(l.amount)>=0; sign=pos?'+':''; cls=pos?'earn':'spend'; amt=fmt(l.amount); lbl=esc(l.label||'수정'); }
+    else if(l.type==='spend'){ sign='-'; cls='spend'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'구매'); }
+    else { sign='-'; cls='spend'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'전달'); }
+    var first = sel ? '<span class="grow1 lbl">'+lbl+'</span>'
+                    : '<span class="grow1">'+esc(l.memberName)+'</span><span class="muted lbl">'+lbl+'</span>';
+    h+='<div class="mini-row">'+first+'<span class="'+cls+'">'+sign+amt+'</span>'
+      + (l.id?'<button class="x" onclick="doUndo(\''+l.id+'\')">취소</button>':'') +'</div>';
+  }
+  if(feed.length===0) h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';
+  h+='</div></div>';
+  return h;
+}
 function fillList(id,q,sel,fn){
   var box=document.getElementById(id); if(!box) return;
   var arr=S.members.filter(function(m){ return m.name.indexOf(q.trim())>=0 || (m.soon||'').indexOf(q.trim())>=0; })
