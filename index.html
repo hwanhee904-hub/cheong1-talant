@@ -135,6 +135,8 @@ var authTab = 'login';
 var adminPin = null;
 var typing = false;
 
+var EMOJI_LIST=['🎁','🏆','🎫','🎉','🎯','🌟','💝','🏅','🎪','🎠','🍕','🍦','🍰','🍩','🍫','🍔','🍜','🍣','🧃','🍿','🎮','📚','🎵','🎨','🎸','🎲','🎭','🧸','☕','🛍️'];
+
 var f = {
   loginName:'', loginPin:'',
   regName:'', regSoon:'', regPhone:'', regTeam:'', regPin:'',
@@ -580,18 +582,15 @@ function adminMarket(){
       +'<button class="btn btn-buy" '+(ok?'':'disabled')+' onclick="doBuy(\''+it.id+'\')">'+(it.stock<=0?'품절':(!m?'참가자 선택':(ok?'구매':'부족')))+'</button></div>';
   }
   if(S.items.length===0) h+='<p class="muted">상품을 추가해 주세요.</p>';
-  var emojiList=['🎁','🏆','🎫','🎉','🎯','🌟','💝','🏅','🎪','🎠',
-    '🍕','🍦','🍰','🍩','🍫','🍔','🍜','🍣','🧃','🍿',
-    '🎮','📚','🎵','🎨','🎸','🎲','🎭','🧸','☕','🛍️'];
   var epHtml='';
   if(f.iEmojiPicker){
     epHtml='<div class="emoji-picker">';
-    for(var ei=0;ei<emojiList.length;ei++){ var em=emojiList[ei];
-      epHtml+='<button class="emoji-opt'+(f.iEmoji===em?' on':'')+'" onclick="pickEmoji(''+em+'')">'+em+'</button>';
+    for(var ei=0;ei<EMOJI_LIST.length;ei++){
+      epHtml+='<button class="emoji-opt'+(f.iEmoji===EMOJI_LIST[ei]?' on':'')+'" onclick="pickEmoji('+ei+')">'+EMOJI_LIST[ei]+'</button>';
     }
     epHtml+='</div>';
   }
-  h+='</div><h3 class="sub">상품 추가</h3>'
+    h+='</div><h3 class="sub">상품 추가</h3>'
     + '<div style="margin-bottom:8px"><button class="emoji-btn" onclick="f.iEmojiPicker=!f.iEmojiPicker;render()" title="아이콘 선택">'+(f.iEmoji||'🎁')+'</button>'
     + '<span class="muted small" style="margin-left:10px">아이콘 클릭해서 선택</span></div>'
     + epHtml
@@ -607,7 +606,7 @@ function doBuy(itemId){
   if(!f.buySel){ toast('참가자를 먼저 선택해 주세요.','bad'); return; }
   call('buy', adminPin, f.buySel, itemId).then(function(){ return refresh(true); }).then(function(){toast('구매 완료!','buy');}).catch(function(e){toast(e.message||e,'bad');});
 }
-function pickEmoji(e){ f.iEmoji=e; f.iEmojiPicker=false; render(); }
+function pickEmoji(i){ f.iEmoji=EMOJI_LIST[i]; f.iEmojiPicker=false; render(); }
 function addItemGo(){
   if(!f.iName.trim()||!f.iPrice||!f.iStock){ toast('상품 정보를 확인해 주세요.','bad'); return; }
   call('addItem', adminPin, f.iName, f.iPrice, f.iStock, f.iEmoji).then(function(){ f.iName=f.iPrice=f.iStock=f.iEmoji=''; f.iEmojiPicker=false; return refresh(true); }).then(function(){toast('상품 추가!');}).catch(function(e){toast(e.message||e,'bad');});
