@@ -434,7 +434,7 @@ function memberPickerHtml(listId, q, selId, onpickFn){
     if(teams.length===0) out='<p class="muted center">팀이 없어요.</p>';
   } else {
     var teamMembers=S.members.filter(function(mm){return mm.teamId===f.pickerTeam;}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
-    out='';render()">&#8249; 순 목록으로</button>';
+    out='';
     for(var mi=0;mi<teamMembers.length;mi++){ var mm=teamMembers[mi];
       out+='<button class="picker-item '+(selId===mm.id?'on':'')+'" onclick="'+onpickFn+'(\''+mm.id+'\')"><span class="dot" style="background:'+teamColor(mm.teamId)+'"></span><span class="grow">'+esc(mm.name)+'</span><span class="muted">'+fmt(mm.talents)+'</span></button>';
     }
