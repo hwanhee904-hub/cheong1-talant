@@ -447,8 +447,11 @@ function setPickerTeam(tid){ f.pickerTeam=tid; render(); }
 function adminEarn(){
   var m=memberById(f.earnSel);
   var quick=[10,20,30,50,100];
-  var backBtn=f.pickerTeam?'<button class="btn btn-ghost" style="font-size:13px;padding:7px 12px" onclick="f.pickerTeam=\'\';render()">뒤로가기</button>':'';
-  var h='<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h2 class="panel-title" style="margin:0">달란트 적립 / 수정</h2>'+backBtn+'</div><label class="field-label">참가자 선택</label>'
+  var earnTeam=f.pickerTeam?S.teams.filter(function(t){return t.id===f.pickerTeam;})[0]:null;
+  var rightInfo=earnTeam
+    ?'<div style="text-align:right"><span style="font-size:14px;font-weight:700;color:var(--ink)">'+esc(earnTeam.name)+'</span><br><span style="font-size:12px;color:var(--gold)">총 '+fmt(teamTotal(earnTeam.id))+'달란트</span><br><button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;margin-top:4px" onclick="f.pickerTeam=\'\';render()">뒤로가기</button></div>'
+    :'';
+  var h='<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h2 class="panel-title" style="margin:0">달란트 적립 / 수정</h2>'+rightInfo+'</div><label class="field-label">참가자 선택</label>'
     + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.earnQ)+'" oninput="f.earnQ=this.value;fillList(\'earnList\',f.earnQ,f.earnSel,\'pickEarn\')">'
     + memberPickerHtml('earnList', f.earnQ, f.earnSel, 'pickEarn');
   if(m) h+='<div class="balance">'+esc(m.name)+' · '+esc(teamNameOf(m.teamId))+' · 보유 <b>'+fmt(m.talents)+'</b></div>';
