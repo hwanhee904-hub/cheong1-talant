@@ -147,7 +147,7 @@ var f = {
   memQ:'',
   genN:'', genSuf:'팀', teamNames:'',
   iEmoji:'', iName:'', iPrice:'', iStock:'', iEmojiPicker:false,
-  pickerTeam:'',
+  pickerTeam:'', memTeam:'',
   distFilter:'undone', distQ:'',
   setTitle:'', setPin:''
 };
@@ -476,26 +476,46 @@ function doUndo(id){
 }
 
 function adminMembers(){
-  var arr=S.members.filter(function(m){ var q=f.memQ.trim(); return m.name.indexOf(q)>=0||(m.soon||'').indexOf(q)>=0; })
-    .sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+  var q=f.memQ.trim();
+  var phones = window.__phones || {};
   var h='<div class="panel"><h2 class="panel-title">멤버 · '+S.members.length+'명</h2>'
     + '<p class="hint">전화번호는 \'멤버 정보 불러오기\'를 눌러야 표시돼요(관리자만).</p>'
-    + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.memQ)+'" oninput="f.memQ=this.value;render()">'
+    + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.memQ)+'" oninput="f.memQ=this.value;f.memTeam=\'\';render()">'
     + '<button class="btn btn-ghost" style="margin-top:10px" onclick="loadPhones()">전화번호 불러오기</button>'
     + '<div class="list" style="margin-top:12px">';
-  var phones = window.__phones || {};
-  for(var i=0;i<arr.length;i++){ var m=arr[i];
-    var opts='<option value="">미배정</option>';
-    for(var j=0;j<S.teams.length;j++){ var t=S.teams[j]; opts+='<option value="'+t.id+'" '+(m.teamId===t.id?'selected':'')+'>'+esc(t.name)+'</option>'; }
-    h+='<div class="member-row"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
-      +'<div class="m-info"><span class="m-name">'+esc(m.name)+' <em>'+esc(m.soon)+'</em></span>'
-      +'<span class="muted small">'+esc(phones[m.id]||'번호: 미표시')+' · '+fmt(m.talents)+' 달란트</span></div>'
-      +'<select class="mini-select" onchange="setMemTeam(\''+m.id+'\',this.value)">'+opts+'</select>'
-      +'<button class="x" style="color:var(--mute);margin-right:2px" onclick="adminResetPin(\''+m.id+'\',\''+esc(m.name)+'\')">PIN</button>'
-      +'<button class="x" onclick="delMember(\''+m.id+'\',\''+esc(m.name)+'\')">삭제</button></div>';
+  if(q){
+    var arr=S.members.filter(function(m){ return m.name.indexOf(q)>=0||(m.soon||'').indexOf(q)>=0; })
+      .sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+    for(var i=0;i<arr.length;i++) h+=memberRow(arr[i],phones);
+    if(arr.length===0) h+='<p class="muted center">참가자가 없습니다.</p>';
+  } else if(!f.memTeam){
+    var teams=S.teams.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+    for(var ti=0;ti<teams.length;ti++){ var t=teams[ti];
+      var cnt=S.members.filter(function(m){return m.teamId===t.id;}).length;
+      h+='<div class="member-row" style="cursor:pointer" onclick="f.memTeam=\''+t.id+'\';render()">'
+        +'<span class="dot" style="background:'+t.color+'"></span>'
+        +'<div class="m-info"><span class="m-name">'+esc(t.name)+'</span></div>'
+        +'<span class="muted">'+cnt+'명 &#8250;</span></div>';
+    }
+    if(teams.length===0) h+='<p class="muted center">팀이 없습니다.</p>';
+  } else {
+    h+='<button class="btn btn-ghost" style="margin-bottom:10px" onclick="f.memTeam=\'\';render()">&#8249; 순 목록으로</button>';
+    var teamMembers=S.members.filter(function(m){return m.teamId===f.memTeam;})
+      .sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+    for(var mi=0;mi<teamMembers.length;mi++) h+=memberRow(teamMembers[mi],phones);
+    if(teamMembers.length===0) h+='<p class="muted center">이 순에 참가자가 없습니다.</p>';
   }
-  if(arr.length===0) h+='<p class="muted center">참가자가 없습니다.</p>';
   return h+'</div></div>';
+}
+function memberRow(m,phones){
+  var opts='<option value="">미배정</option>';
+  for(var j=0;j<S.teams.length;j++){ var t=S.teams[j]; opts+='<option value="'+t.id+'" '+(m.teamId===t.id?'selected':'')+'>'+esc(t.name)+'</option>'; }
+  return '<div class="member-row"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
+    +'<div class="m-info"><span class="m-name">'+esc(m.name)+' <em>'+esc(m.soon)+'</em></span>'
+    +'<span class="muted small">'+esc((phones||{})[m.id]||'번호: 미표시')+' · '+fmt(m.talents)+' 달란트</span></div>'
+    +'<select class="mini-select" onchange="setMemTeam(\''+m.id+'\',this.value)">'+opts+'</select>'
+    +'<button class="x" style="color:var(--mute);margin-right:2px" onclick="adminResetPin(\''+m.id+'\',\''+esc(m.name)+'\')">PIN</button>'
+    +'<button class="x" onclick="delMember(\''+m.id+'\',\''+esc(m.name)+'\')">삭제</button></div>';
 }
 function loadPhones(){
   call('getAdminData', adminPin).then(function(d){
