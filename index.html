@@ -442,7 +442,8 @@ function memberPickerHtml(listId, q, selId, onpickFn){
   }
   return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
 }
-function setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=0; render(); }nction adminEarn(){
+function setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=0; render(); }
+function adminEarn(){
   var m=memberById(f.earnSel);
   var quick=[10,20,30,50,100];
   var earnTeam=f.pickerTeam?S.teams.filter(function(t){return t.id===f.pickerTeam;})[0]:null;
@@ -508,7 +509,9 @@ function fillList(id,q,sel,fn){
   if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
   box.innerHTML=out;
 }
-function pickEarn(id){ f.efunction pickEarn(id){ f.earnSel=id; f.earnLogMore=0; render(); } a = (q!=null)? q : Math.round(Number(f.earnAmt));
+function pickEarn(id){ f.earnSel=id; f.earnLogMore=0; render(); }
+function doEarn(q){
+  var a = (q!=null)? q : Math.round(Number(f.earnAmt));
   if(!f.earnSel||!a){ toast('대상과 수량을 확인해 주세요.','bad'); return; }
   call('earn', adminPin, f.earnSel, a, f.earnLabel).then(function(m){
     f.earnAmt=''; f.earnLabel=''; return refresh(true);
