@@ -502,7 +502,7 @@ function fillList(id,q,sel,fn){
   if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
   box.innerHTML=out;
 }
-function pickEarn(id){ f.earnSel=id; f.pickerTeam=''; render(); }
+function pickEarn(id){ f.earnSel=id; render(); }
 function doEarn(q){
   var a = (q!=null)? q : Math.round(Number(f.earnAmt));
   if(!f.earnSel||!a){ toast('대상과 수량을 확인해 주세요.','bad'); return; }
@@ -644,7 +644,7 @@ function adminMarket(){
     + '<button class="btn btn-primary" onclick="addItemGo()">추가</button></div></div>';
   return h;
 }
-function pickBuy(id){ f.buySel=id; f.pickerTeam=''; render(); }
+function pickBuy(id){ f.buySel=id; render(); }
 function doBuy(itemId){
   if(!f.buySel){ toast('참가자를 먼저 선택해 주세요.','bad'); return; }
   call('buy', adminPin, f.buySel, itemId).then(function(){ return refresh(true); }).then(function(){toast('구매 완료!','buy');}).catch(function(e){toast(e.message||e,'bad');});
