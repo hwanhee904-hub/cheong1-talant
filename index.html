@@ -83,7 +83,7 @@ body{margin:0;min-height:100vh;background:radial-gradient(120% 80% at 80% -10%,#
 .item-stock{font-size:12px;color:var(--mute);margin:3px 0;}
 .mini-feed{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;}
 .mini-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0;align-items:center;}
-.mini-row .grow1{font-weight:500;white-space:nowrap;}
+.mini-row .grow1{font-weight:500;white-space:nowraw;}
 .mini-row .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mini-row .earn{color:var(--mint);font-weight:700;}.mini-row .spend{color:var(--coral);font-weight:700;}
 .muted{color:var(--mute);}
@@ -404,7 +404,7 @@ function adminView(){
   var h='<div class="tabs">';
   for(var i=0;i<tabs.length;i++){
     var label=tabs[i][1]+(tabs[i][0]==='dist'&&distBadge>0?'<span class="tab-badge">'+distBadge+'</span>':'');
-    h+='<button class="'+(aview===tabs[i][0]?'on':'')+'" onclick="setAview('+String.fromCharCode(39)+tabs[i][0]+String.fromCharCode(39)+')">'+label+'</button>';
+    h+='<button class="'+(aview===tabs[i][0]?'on':'')+'" onclick="setAview(\''+tabs[i][0]+'\')">'+label+'</button>';
   }
   h+='</div>';
   if(aview==='earn') h+=adminEarn();
@@ -418,31 +418,42 @@ function adminView(){
 
 function memberPickerHtml(listId, q, selId, onpickFn){
   var out='';
+  // 검색어 있으면 바로 멤버 목록
   if(q && q.trim()){
     var arr=S.members.filter(function(m){ return m.name.indexOf(q.trim())>=0 || (m.soon||'').indexOf(q.trim())>=0; })
       .sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).slice(0,50);
     for(var i=0;i<arr.length;i++){ var m=arr[i];
-      out+='<button class="picker-item '+(selId===m.id?'on':'')+'" onclick="'+onpickFn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span><span class="grow">'+esc(m.name)+'</span><span class="muted">'+fmt(m.talents)+'</span></button>';
+      out+='<button class="picker-item '+(selId===m.id?'on':'')+'" onclick="'+onpickFn+'(\''+m.id+'\')"><span class="dot" style="background:'+teamColor(m.teamId)+'"></span>'
+        +'<span class="grow">'+esc(m.name)+' <em>'+esc(teamNameOf(m.teamId))+'</em></span><span class="muted">'+fmt(m.talents)+'</span></button>';
     }
     if(arr.length===0) out='<p class="muted center">참가자가 없어요.</p>';
   } else if(!f.pickerTeam){
+    // 1단계: 순 목록
     var teams=S.teams.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
     for(var ti=0;ti<teams.length;ti++){ var t=teams[ti];
-      var cnt=S.members.filter(function(mm){return mm.teamId===t.id;}).length;
-      out+='<button class="picker-item" onclick="f.pickerTeam=\''+t.id+'\';render()"><span class="dot" style="background:'+t.color+'"></span><span class="grow">'+esc(t.name)+'</span><span class="muted small">'+cnt+'명 &#8250;</span></button>';
+      var cnt=S.members.filter(function(m){return m.teamId===t.id;}).length;
+      out+='<button class="picker-item" onclick="f.pickerTeam=\''+t.id+'\';render()">'
+        +'<span class="dot" style="background:'+t.color+'"></span>'
+        +'<span class="grow">'+esc(t.name)+'</span>'
+        +'<span class="muted small">'+cnt+'명 ›</span></button>';
     }
     if(teams.length===0) out='<p class="muted center">팀이 없어요.</p>';
   } else {
-    var teamMembers=S.members.filter(function(mm){return mm.teamId===f.pickerTeam;}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+    // 2단계: 선택된 순의 멤버
+    var teamMembers=S.members.filter(function(m){return m.teamId===f.pickerTeam;})
+      .sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+    var tname=teamNameOf(f.pickerTeam);
     out='';
     for(var mi=0;mi<teamMembers.length;mi++){ var mm=teamMembers[mi];
-      out+='<button class="picker-item '+(selId===mm.id?'on':'')+'" onclick="'+onpickFn+'(\''+mm.id+'\')"><span class="dot" style="background:'+teamColor(mm.teamId)+'"></span><span class="grow">'+esc(mm.name)+'</span><span class="muted">'+fmt(mm.talents)+'</span></button>';
+      out+='<button class="picker-item '+(selId===mm.id?'on':'')+'" onclick="'+onpickFn+'(\''+mm.id+'\')"><span class="dot" style="background:'+teamColor(mm.teamId)+'"></span>'
+        +'<span class="grow">'+esc(mm.name)+'</span><span class="muted">'+fmt(mm.talents)+'</span></button>';
     }
     if(teamMembers.length===0) out+='<p class="muted center">이 순에 참가자가 없어요.</p>';
   }
   return '<div class="picker-list" id="'+listId+'">'+out+'</div>';
 }
 function setPickerTeam(tid){ f.pickerTeam=tid; f.earnLogMore=0; render(); }
+
 function adminEarn(){
   var m=memberById(f.earnSel);
   var quick=[10,20,30,50,100];
@@ -478,7 +489,8 @@ function adminEarn(){
     feed=S.log;
     hdr='최근 기록 (취소로 되돌리기)';
   }
-  va  var maxShow=10+f.earnLogMore;ar shown=feed.slice(0,maxShow);
+  var maxShow=10+f.earnLogMore;
+  var shown=feed.slice(0,maxShow);
   h+='<div class="mini-feed"><div class="muted small" style="margin-bottom:6px">'+hdr+'</div>';
   for(var k=0;k<shown.length;k++){ var l=shown[k];
     var received = !!sel && l.type==='transfer' && l.ref===sel;
@@ -490,11 +502,13 @@ function adminEarn(){
     else { sign='-'; cls='spend'; amt=fmt(Math.abs(l.amount)); lbl=esc(l.label||'전달'); }
     var first = sel ? '<span class="grow1 lbl">'+lbl+'</span>'
                     : '<span class="grow1">'+esc(l.memberName)+'</span><span class="muted lbl">'+lbl+'</span>';
-    h+='<div class="mini-row">'+first+'<span class="'+cls+'">'+sign+amt+'</span>'
+    h+='<div class="mini-row">'+first
+      +'<span class="'+cls+'">'+sign+amt+'</span>'
       + (l.id?'<button class="x" onclick="doUndo(\''+l.id+'\')">취소</button>':'') +'</div>';
   }
   if(shown.length===0) h+='<p class="muted center">'+(sel?'이 참가자의 기록이 없어요.':'아직 기록이 없어요.')+'</p>';
-  if(!f.earnLogM  if(maxShow<feed.length) h+='<button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:13px" onclick="f.earnLogMore+=5;render()">+ 더보기 ('+(feed.length-maxShow)+'개 더)</button>';iv>';
+  if(maxShow<feed.length) h+='<button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:13px" onclick="f.earnLogMore+=5;render()">+ 더보기 ('+(feed.length-maxShow)+'개 더)</button>';
+  h+='</div></div>';
   return h;
 }
 function fillList(id,q,sel,fn){
@@ -543,21 +557,24 @@ function adminMembers(){
     + '<button class="btn btn-ghost" style="margin-top:10px" onclick="loadPhones()">전화번호 불러오기</button>'
     + '<div class="list" style="margin-top:12px">';
   if(q){
+    // 검색어 있으면 전체 필터
     var arr=S.members.filter(function(m){ return m.name.indexOf(q)>=0||(m.soon||'').indexOf(q)>=0; })
       .sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
-    for(var i=0;i<arr.length;i++) h+=memberRow(arr[i],phones);
+    for(var i=0;i<arr.length;i++) h+=memberRow(arr[i], phones);
     if(arr.length===0) h+='<p class="muted center">참가자가 없습니다.</p>';
   } else if(!f.memTeam){
+    // 1단계: 순 목록
     var teams=S.teams.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
     for(var ti=0;ti<teams.length;ti++){ var t=teams[ti];
       var cnt=S.members.filter(function(m){return m.teamId===t.id;}).length;
       h+='<div class="member-row" style="cursor:pointer" onclick="f.memTeam=\''+t.id+'\';render()">'
         +'<span class="dot" style="background:'+t.color+'"></span>'
         +'<div class="m-info"><span class="m-name">'+esc(t.name)+'</span></div>'
-        +'<span class="muted">'+cnt+'명 &#8250;</span></div>';
+        +'<span class="muted">'+cnt+'명 ›</span></div>';
     }
     if(teams.length===0) h+='<p class="muted center">팀이 없습니다.</p>';
   } else {
+    // 2단계: 선택된 순의 멤버
     var memTeamObj=S.teams.filter(function(t){return t.id===f.memTeam;})[0];
     var leaderName=memTeamObj?memTeamObj.name.replace(/\s*순\s*$/,''):'';
     var teamMembers=S.members.filter(function(m){return m.teamId===f.memTeam;})
@@ -566,14 +583,15 @@ function adminMembers(){
         if(aL!==bL) return aL-bL;
         return a.name.localeCompare(b.name,'ko');
       });
-    for(var mi=0;mi<teamMembers.length;mi++) h+=memberRow(teamMembers[mi],phones);
+    for(var mi=0;mi<teamMembers.length;mi++) h+=memberRow(teamMembers[mi], phones);
     if(teamMembers.length===0) h+='<p class="muted center">이 순에 참가자가 없습니다.</p>';
   }
   return h+'</div></div>';
 }
-function memberRow(m,phones){
+function memberRow(m, phones){
   var opts='<option value="">미배정</option>';
   for(var j=0;j<S.teams.length;j++){ var t=S.teams[j]; opts+='<option value="'+t.id+'" '+(m.teamId===t.id?'selected':'')+'>'+esc(t.name)+'</option>'; }
+  // 순장 판별: 팀 이름이 "[이름] 순" 형식일 때 이름 부분이 멤버 이름과 일치
   var myTeam=S.teams.filter(function(t){return t.id===m.teamId;})[0];
   var isLeader=myTeam && myTeam.name.replace(/\s*순\s*$/, '')===m.name;
   var crown=isLeader?'<span style="font-size:12px;vertical-align:super;margin-left:2px">👑</span>':'';
@@ -652,7 +670,7 @@ function adminMarket(){
     }
     epHtml+='</div>';
   }
-    h+='</div><h3 class="sub">상품 추가</h3>'
+  h+='</div><h3 class="sub">상품 추가</h3>'
     + '<div style="margin-bottom:8px"><button class="emoji-btn" onclick="f.iEmojiPicker=!f.iEmojiPicker;render()" title="아이콘 선택">'+(f.iEmoji||'🎁')+'</button>'
     + '<span class="muted small" style="margin-left:10px">아이콘 클릭해서 선택</span></div>'
     + epHtml
@@ -671,7 +689,7 @@ function doBuy(itemId){
 function pickEmoji(i){ f.iEmoji=EMOJI_LIST[i]; f.iEmojiPicker=false; render(); }
 function addItemGo(){
   if(!f.iName.trim()||!f.iPrice||!f.iStock){ toast('상품 정보를 확인해 주세요.','bad'); return; }
-  call('addItem', adminPin, f.iName, f.iPrice, f.iStock, f.iEmoji).then(function(){ f.iName=f.iPrice=f.iStock=f.iEmoji=''; f.iEmojiPicker=false; return refresh(true); }).then(function(){toast('상품 추가!');}).catch(function(e){toast(e.message||e,'bad');});
+  call('addItem', adminPin, f.iName, f.iPrice, f.iStock, f.iEmoji).then(function(){ f.iName=f.iPrice=f.iStock=f.iEmoji=''; f.iEmojiPicker=false; return refresh(true); }).then(function(){toast('상품 추가!');}).catch(function(e){toast(e.message||e,'fad');});
 }
 function delItem(id){ call('removeItem', adminPin, id).then(function(){ return refresh(true); }).catch(function(e){toast(e.message||e,'bad');}); }
 
