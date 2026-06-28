@@ -8,7 +8,7 @@ const PALETTE = [
 ];
 
 function defaultState() {
-  return { title: '청1 방학숙제', pin: '1234', open: true, teams: [], members: [], items: [], log: [], purchases: [], seq: 0 };
+  return { title: '청1 방학숙제', pin: '1234', open: true, teams: [], members: [], items: [], log: [], purchases: [], missions: [], seq: 0 };
 }
 
 function uid_(s) { s.seq = (s.seq || 0) + 1; return 'id' + s.seq + '_' + Math.floor(Math.random() * 10000); }
@@ -60,6 +60,7 @@ const actions = {
       teams: s.teams,
       members: s.members.map(m => pubMember_(m)),
       items: s.items,
+      missions: s.missions || [],
       log: (s.log || []).slice(0, 30)
     };
   },
@@ -306,6 +307,25 @@ const actions = {
     if (patch.title !== undefined) s.title = trim_(patch.title) || '청1 방학숙제';
     if (patch.newPin !== undefined && trim_(patch.newPin)) s.pin = trim_(patch.newPin);
     if (patch.open !== undefined) s.open = !!patch.open;
+    await writeState(s);
+    return true;
+  },
+
+  async addMission(pin, name, desc, amount) {
+    const s = await readState();
+    checkPin_(s, pin);
+    if (!trim_(name)) throw new Error('미션 이름을 입력해 주세요.');
+    if (!s.missions) s.missions = [];
+    s.missions.push({ id: uid_(s), name: trim_(name), desc: trim_(desc), amount: Math.round(Number(amount)) || 0 });
+    await writeState(s);
+    return s.missions;
+  },
+
+  async removeMission(pin, missionId) {
+    const s = await readState();
+    checkPin_(s, pin);
+    if (!s.missions) return true;
+    s.missions = s.missions.filter(m => m.id !== missionId);
     await writeState(s);
     return true;
   },
