@@ -150,7 +150,7 @@ var f = {
   pickerTeam:'', memTeam:'', earnLogMore:0,
   distFilter:'undone', distQ:'',
   setTitle:'', setPin:'',
-  missionName:'', missionDesc:'', missionAmt:''
+  missionName:'', missionDesc:'', missionAmt:'', missionEditId:''
 };
 
 document.addEventListener('focusin', function(e){ if(e.target.matches('input,textarea,select')) typing=true; });
@@ -659,33 +659,58 @@ function delTeam(id,name){ if(!confirm(name+' 팀을 삭제할까요? (소속 �
 
 function adminMissions(){
   var missions=S.missions||[];
+  var isEdit=!!f.missionEditId;
   var h='<div class="panel"><h2 class="panel-title">미션 목록 · '+missions.length+'개</h2>'
     +'<p class="hint">미션을 등록하면 적립 탭에서 바로 선택할 수 있어요.</p>'
+    +(isEdit?'<div class="hint" style="color:var(--gold);margin-bottom:4px">✏️ 수정 중</div>':'')
     +'<label class="field-label">미션 이름</label>'
     +'<input class="input" value="'+esc(f.missionName)+'" oninput="f.missionName=this.value" placeholder="예: 화요일 모임 참석">'
     +'<label class="field-label">설명 (선택)</label>'
     +'<input class="input" value="'+esc(f.missionDesc)+'" oninput="f.missionDesc=this.value" placeholder="예: 화/금 정기 모임 참여">'
     +'<label class="field-label">달란트</label>'
     +'<div class="row"><input class="input narrow" type="number" value="'+esc(f.missionAmt)+'" oninput="f.missionAmt=this.value" placeholder="예: 10">'
-    +'<button class="btn btn-primary" onclick="addMissionGo()">추가</button></div>'
+    +'<button class="btn btn-primary" onclick="addMissionGo()">'+(isEdit?'저장':'추가')+'</button>'
+    +(isEdit?'<button class="btn btn-ghost" onclick="cancelMissionEdit()">취소</button>':'')
+    +'</div>'
     +'<div class="list" style="margin-top:16px">';
   if(missions.length===0){
     h+='<p class="muted center">등록된 미션이 없어요.</p>';
   } else {
     for(var i=0;i<missions.length;i++){ var ms=missions[i];
-      h+='<div class="list-row"><div style="flex:1"><span style="font-weight:700">'+esc(ms.name)+'</span>'
+      var isThis=f.missionEditId===ms.id;
+      h+='<div class="list-row"'+(isThis?' style="border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)"':'')+'>'+
+          '<div style="flex:1"><span style="font-weight:700">'+esc(ms.name)+'</span>'
         +(ms.desc?'<span class="muted small" style="margin-left:8px">'+esc(ms.desc)+'</span>':'')+'</div>'
         +'<span class="chip">+'+fmt(ms.amount)+'D</span>'
+        +'<button class="x" style="color:var(--gold);margin-right:2px" onclick="editMission(\''+ms.id+'\')">수정</button>'
         +'<button class="x" onclick="delMission(\''+ms.id+'\')">삭제</button></div>';
     }
   }
   return h+'</div></div>';
 }
+function editMission(id){
+  var ms=(S.missions||[]).find(function(m){return m.id===id;});
+  if(!ms) return;
+  f.missionEditId=id; f.missionName=ms.name; f.missionDesc=ms.desc||''; f.missionAmt=String(ms.amount);
+  render();
+  // 폼 맨 위로 스크롤
+  var panel=document.querySelector('.panel');
+  if(panel) panel.scrollIntoView({behavior:'smooth'});
+}
+function cancelMissionEdit(){
+  f.missionEditId=''; f.missionName=''; f.missionDesc=''; f.missionAmt=''; render();
+}
 function addMissionGo(){
   if(!f.missionName.trim()||f.missionAmt===''){ toast('미션 이름과 달란트를 입력해 주세요.','bad'); return; }
-  call('addMission', adminPin, f.missionName, f.missionDesc, Number(f.missionAmt)).then(function(){
-    f.missionName=''; f.missionDesc=''; f.missionAmt=''; return refresh(true);
-  }).then(function(){ toast('미션 추가 완료!'); }).catch(function(e){ toast(e.message||e,'bad'); });
+  if(f.missionEditId){
+    call('updateMission', adminPin, f.missionEditId, f.missionName, f.missionDesc, Number(f.missionAmt)).then(function(){
+      f.missionEditId=''; f.missionName=''; f.missionDesc=''; f.missionAmt=''; return refresh(true);
+    }).then(function(){ toast('미션 수정 완료!'); }).catch(function(e){ toast(e.message||e,'bad'); });
+  } else {
+    call('addMission', adminPin, f.missionName, f.missionDesc, Number(f.missionAmt)).then(function(){
+      f.missionName=''; f.missionDesc=''; f.missionAmt=''; return refresh(true);
+    }).then(function(){ toast('미션 추가 완료!'); }).catch(function(e){ toast(e.message||e,'bad'); });
+  }
 }
 function delMission(id){
   if(!confirm('이 미션을 삭제할까요?')) return;
