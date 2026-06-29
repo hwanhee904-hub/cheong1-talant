@@ -83,7 +83,7 @@ body{margin:0;min-height:100vh;background:radial-gradient(120% 80% at 80% -10%,#
 .item-stock{font-size:12px;color:var(--mute);margin:3px 0;}
 .mini-feed{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;}
 .mini-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0;align-items:center;}
-.mini-row .grow1{font-weight:500;white-space:nowraw;}
+.mini-row .grow1{font-weight:500;white-space:nowrap;}
 .mini-row .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mini-row .earn{color:var(--mint);font-weight:700;}.mini-row .spend{color:var(--coral);font-weight:700;}
 .muted{color:var(--mute);}
@@ -149,7 +149,8 @@ var f = {
   iEmoji:'', iName:'', iPrice:'', iStock:'', iEmojiPicker:false,
   pickerTeam:'', memTeam:'', earnLogMore:0,
   distFilter:'undone', distQ:'',
-  setTitle:'', setPin:''
+  setTitle:'', setPin:'',
+  missionName:'', missionDesc:'', missionAmt:''
 };
 
 document.addEventListener('focusin', function(e){ if(e.target.matches('input,textarea,select')) typing=true; });
@@ -399,7 +400,7 @@ function submitPin(){
 }
 function setAview(v){ aview=v; if(v==='dist'){ loadPurchases(); } render(); }
 function adminView(){
-  var tabs=[['earn','적립'],['members','멤버'],['teams','팀'],['market','시장'],['dist','배부'],['settings','설정']];
+  var tabs=[['earn','적립'],['members','멤버'],['teams','팀'],['missions','미션'],['market','시장'],['dist','배부'],['settings','설정']];
   var distBadge=(window.__purchases&&window.__purchases.filter(function(p){return !p.done&&!p.cancelled;}).length)||0;
   var h='<div class="tabs">';
   for(var i=0;i<tabs.length;i++){
@@ -410,6 +411,7 @@ function adminView(){
   if(aview==='earn') h+=adminEarn();
   else if(aview==='members') h+=adminMembers();
   else if(aview==='teams') h+=adminTeams();
+  else if(aview==='missions') h+=adminMissions();
   else if(aview==='market') h+=adminMarket();
   else if(aview==='dist') h+=adminDistribute();
   else h+=adminSettings();
@@ -464,7 +466,16 @@ function adminEarn(){
     + '<input class="input" placeholder="이름/순 검색" value="'+esc(f.earnQ)+'" oninput="f.earnQ=this.value;fillList(\'earnList\',f.earnQ,f.earnSel,\'pickEarn\')">'
     + memberPickerHtml('earnList', f.earnQ, f.earnSel, 'pickEarn');
   if(m) h+='<div class="balance">'+esc(m.name)+' · '+esc(teamNameOf(m.teamId))+' · 보유 <b>'+fmt(m.talents)+'</b></div>';
-  h+='<label class="field-label">미션 / 사유 (선택)</label><input class="input" value="'+esc(f.earnLabel)+'" oninput="f.earnLabel=this.value" placeholder="예: 새벽기도 참석">'
+  var missions=S.missions||[];
+  var missionPills='';
+  if(missions.length>0){
+    for(var mi=0;mi<missions.length;mi++){ var ms=missions[mi];
+      missionPills+='<button class="pill'+(f.earnLabel===ms.name&&f.earnAmt===String(ms.amount)?' on':'')+'" onclick="f.earnLabel=\''+esc(ms.name)+'\';f.earnAmt=\''+ms.amount+'\';render()">'+esc(ms.name)+' <em>+'+fmt(ms.amount)+'</em></button>';
+    }
+  }
+  h+='<label class="field-label">미션 선택 (등록된 미션)</label>'
+    +(missions.length>0?'<div class="team-pills" style="margin-bottom:10px">'+missionPills+'</div>':'<p class="muted small" style="margin:0 0 10px">등록된 미션 없음 — 미션 탭에서 추가하세요.</p>')
+    +'<label class="field-label">미션 / 사유 (직접 입력)</label><input class="input" value="'+esc(f.earnLabel)+'" oninput="f.earnLabel=this.value;render()" placeholder="예: 새벽기도 참석">'
     + '<label class="field-label">빠른 적립</label><div class="quick-row">';
   for(var i=0;i<quick.length;i++) h+='<button class="quick" '+(m?'':'disabled')+' onclick="doEarn('+quick[i]+')">+'+quick[i]+'</button>';
   h+='</div><label class="field-label">직접 입력 · 차감하려면 마이너스 (예: -50)</label><div class="row">'
@@ -646,6 +657,42 @@ function addTeamsByName(){
 }
 function delTeam(id,name){ if(!confirm(name+' 팀을 삭제할까요? (소속 인원은 미배정 처리)')) return; call('removeTeam', adminPin, id).then(function(){ return refresh(true); }).catch(function(e){toast(e.message||e,'bad');}); }
 
+function adminMissions(){
+  var missions=S.missions||[];
+  var h='<div class="panel"><h2 class="panel-title">미션 목록 · '+missions.length+'개</h2>'
+    +'<p class="hint">미션을 등록하면 적립 탭에서 바로 선택할 수 있어요.</p>'
+    +'<label class="field-label">미션 이름</label>'
+    +'<input class="input" value="'+esc(f.missionName)+'" oninput="f.missionName=this.value" placeholder="예: 화요일 모임 참석">'
+    +'<label class="field-label">설명 (선택)</label>'
+    +'<input class="input" value="'+esc(f.missionDesc)+'" oninput="f.missionDesc=this.value" placeholder="예: 화/금 정기 모임 참여">'
+    +'<label class="field-label">달란트</label>'
+    +'<div class="row"><input class="input narrow" type="number" value="'+esc(f.missionAmt)+'" oninput="f.missionAmt=this.value" placeholder="예: 10">'
+    +'<button class="btn btn-primary" onclick="addMissionGo()">추가</button></div>'
+    +'<div class="list" style="margin-top:16px">';
+  if(missions.length===0){
+    h+='<p class="muted center">등록된 미션이 없어요.</p>';
+  } else {
+    for(var i=0;i<missions.length;i++){ var ms=missions[i];
+      h+='<div class="list-row"><div style="flex:1"><span style="font-weight:700">'+esc(ms.name)+'</span>'
+        +(ms.desc?'<span class="muted small" style="margin-left:8px">'+esc(ms.desc)+'</span>':'')+'</div>'
+        +'<span class="chip">+'+fmt(ms.amount)+'D</span>'
+        +'<button class="x" onclick="delMission(\''+ms.id+'\')">삭제</button></div>';
+    }
+  }
+  return h+'</div></div>';
+}
+function addMissionGo(){
+  if(!f.missionName.trim()||f.missionAmt===''){ toast('미션 이름과 달란트를 입력해 주세요.','bad'); return; }
+  call('addMission', adminPin, f.missionName, f.missionDesc, Number(f.missionAmt)).then(function(){
+    f.missionName=''; f.missionDesc=''; f.missionAmt=''; return refresh(true);
+  }).then(function(){ toast('미션 추가 완료!'); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+function delMission(id){
+  if(!confirm('이 미션을 삭제할까요?')) return;
+  call('removeMission', adminPin, id).then(function(){ return refresh(true); })
+    .then(function(){ toast('삭제했어요.'); }).catch(function(e){ toast(e.message||e,'bad'); });
+}
+
 function adminMarket(){
   var m=memberById(f.buySel);
   var backBtn=f.pickerTeam?'<button class="btn btn-ghost" style="font-size:13px;padding:7px 12px" onclick="f.pickerTeam=\'\';render()">뒤로가기</button>':'';
@@ -689,7 +736,7 @@ function doBuy(itemId){
 function pickEmoji(i){ f.iEmoji=EMOJI_LIST[i]; f.iEmojiPicker=false; render(); }
 function addItemGo(){
   if(!f.iName.trim()||!f.iPrice||!f.iStock){ toast('상품 정보를 확인해 주세요.','bad'); return; }
-  call('addItem', adminPin, f.iName, f.iPrice, f.iStock, f.iEmoji).then(function(){ f.iName=f.iPrice=f.iStock=f.iEmoji=''; f.iEmojiPicker=false; return refresh(true); }).then(function(){toast('상품 추가!');}).catch(function(e){toast(e.message||e,'fad');});
+  call('addItem', adminPin, f.iName, f.iPrice, f.iStock, f.iEmoji).then(function(){ f.iName=f.iPrice=f.iStock=f.iEmoji=''; f.iEmojiPicker=false; return refresh(true); }).then(function(){toast('상품 추가!');}).catch(function(e){toast(e.message||e,'bad');});
 }
 function delItem(id){ call('removeItem', adminPin, id).then(function(){ return refresh(true); }).catch(function(e){toast(e.message||e,'bad');}); }
 
