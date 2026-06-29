@@ -321,6 +321,20 @@ const actions = {
     return s.missions;
   },
 
+  async updateMission(pin, missionId, name, desc, amount) {
+    const s = await readState();
+    checkPin_(s, pin);
+    if (!trim_(name)) throw new Error('미션 이름을 입력해 주세요.');
+    if (!s.missions) throw new Error('미션을 찾을 수 없어요.');
+    const ms = s.missions.find(m => m.id === missionId);
+    if (!ms) throw new Error('미션을 찾을 수 없어요.');
+    ms.name = trim_(name);
+    ms.desc = trim_(desc);
+    ms.amount = Math.round(Number(amount)) || 0;
+    await writeState(s);
+    return s.missions;
+  },
+
   async removeMission(pin, missionId) {
     const s = await readState();
     checkPin_(s, pin);
